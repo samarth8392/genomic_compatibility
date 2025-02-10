@@ -11,7 +11,6 @@
 ###                          Samarth Mathur, PhD                     	###
 ###                        The Ohio State University                 	###
 ###                                                                     ###
-###     Date Created: 07/10/22                  Last Modified: 08/22/22 ###
 ###########################################################################
 ###########################################################################
 ###                     genotypeGVCF.sh                        			###
@@ -19,9 +18,8 @@
 
 cd $SLURM_SUBMIT_DIR
 module load gatk #gatk/4.1.2.0
-#module load vcftools
-#module load clara-parabricks
 
+MAINDIR="/fs/ess/scratch/PAS1533/smathur/ibd"
 
 ## STEP3: genotypeGVCF
 
@@ -33,7 +31,7 @@ module load gatk #gatk/4.1.2.0
 
 # Step1
 
-cd /fs/ess/scratch/PAS1533/smathur/ibd/variantCall/gatk/
+cd $MAINDIR/variantCall/gatk/
 
 while read -a chr
 do 
@@ -49,30 +47,30 @@ do
 cd $SLURM_SUBMIT_DIR
 module load gatk
 
-cd /fs/ess/scratch/PAS1533/smathur/ibd/variantCall/gatk/
+cd $MAINDIR/variantCall/gatk/
 mkdir tmp_${chr}
 gatk --java-options \"-Xmx170g -XX:+UseParallelGC -XX:ParallelGCThreads=48\" GenomicsDBImport \
---genomicsdb-workspace-path all202.${chr}.gDB \
+--genomicsdb-workspace-path final152.${chr}.gDB \
 --batch-size 50 \
 -L ${chr} \
---sample-name-map all202.sampleMap \
+--sample-name-map final152.sampleMap \
 --tmp-dir=tmp_${chr} \
 --reader-threads 10
 
 gatk --java-options \"-Xmx170g -XX:+UseParallelGC -XX:ParallelGCThreads=48\" GenotypeGVCFs \
--R /fs/ess/scratch/PAS1533/smathur/ibd/ref/scat/Scatenatus_HiC_v1.1.fasta \
--V gendb://all202.${chr}.gDB \
--O all202.${chr}.vcf 
+-R $MAINDIR/ref/scat/Scatenatus_HiC_v1.1.fasta \
+-V gendb://final152.${chr}.gDB \
+-O final152.${chr}.vcf 
 
 rm tmp_${chr}" \
-> /fs/ess/scratch/PAS1533/smathur/ibd/jobcodes/per_chr/${chr}.gDB.sh
-done < /fs/ess/scratch/PAS1533/smathur/ibd/variantCall/gatk/chrList.txt
+> $MAINDIR/jobcodes/per_chr/${chr}.gDB.sh
+done < $MAINDIR/variantCall/gatk/chrList.txt
   
 
 #### submit jobs ####
 
 while read -a chr
 do
-	cd /fs/ess/scratch/PAS1533/smathur/ibd/errors/per_chr/
-	sbatch  /fs/ess/scratch/PAS1533/smathur/ibd/jobcodes/per_chr/${chr}.gDB.sh
-done < /fs/ess/scratch/PAS1533/smathur/ibd/variantCall/gatk/chrList.txt
+	cd $MAINDIR/errors/per_chr/
+	sbatch  $MAINDIR/jobcodes/per_chr/${chr}.gDB.sh
+done < $MAINDIR/variantCall/gatk/chrList.txt
