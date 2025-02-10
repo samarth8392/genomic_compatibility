@@ -18,6 +18,7 @@
 ###########################################################################
 
 cd $SLURM_SUBMIT_DIR
+MAINDIR="/fs/ess/scratch/PAS1533/smathur/ibd"
 
 while read -a line
 do 
@@ -33,29 +34,29 @@ do
 cd $SLURM_SUBMIT_DIR
 module load samtools
 
-cd /fs/ess/scratch/PAS1533/smathur/ibd/align/stats/
+cd $MAINDIR/align/stats/
 
-samtools depth -a /fs/ess/scratch/PAS1533/smathur/ibd/align/final_bam/${line}_mark_dups.bam \
+samtools depth -a $MAINDIR/align/final_bam/${line}_mark_dups.bam \
 | awk '{c++;s+=\$3}END{print s/c}' \
 > ${line}.meandepth.txt
 
-samtools depth -a /fs/ess/scratch/PAS1533/smathur/ibd/align/final_bam/${line}_mark_dups.bam \
+samtools depth -a $MAINDIR/align/final_bam/${line}_mark_dups.bam \
 | awk '{c++; if(\$3>0) total+=1}END{print (total/c)*100}' \
 > ${line}.1xbreadth.txt
 
-samtools depth -a /fs/ess/scratch/PAS1533/smathur/ibd/align/final_bam/${line}_mark_dups.bam \
+samtools depth -a $MAINDIR/align/final_bam/${line}_mark_dups.bam \
 | awk '{c++; if(\$3>=10) total+=1}END{print (total/c)*100}' \
 > ${line}.10xbreadth.txt
 
-samtools flagstat /fs/ess/scratch/PAS1533/smathur/ibd/align/final_bam/${line}_mark_dups.bam \
+samtools flagstat $MAINDIR/align/final_bam/${line}_mark_dups.bam \
 > ${line}.mapstats.txt" \
-> /fs/ess/scratch/PAS1533/smathur/ibd/jobcodes/per_ind/${line}/${line}.mapStats.sh
-done < /fs/ess/scratch/PAS1533/smathur/ibd/align/lists/onlyNew2.txt
+> $MAINDIR/jobcodes/per_ind/${line}/${line}.mapStats.sh
+done < $MAINDIR/lists/final152.sampleList.txt
 
 #### submit jobs ####
 
 while read -a line
 do
-	cd /fs/ess/scratch/PAS1533/smathur/ibd/errors/per_ind/${line}
-	sbatch  /fs/ess/scratch/PAS1533/smathur/ibd/jobcodes/per_ind/${line}/${line}.mapStats.sh
-done <  /fs/ess/scratch/PAS1533/smathur/ibd/align/lists/onlyNew2.txt
+	cd $MAINDIR/errors/per_ind/${line}
+	sbatch  $MAINDIR/jobcodes/per_ind/${line}/${line}.mapStats.sh
+done <  $MAINDIR/lists/final152.sampleList.txt
