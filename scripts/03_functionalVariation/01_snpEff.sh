@@ -11,7 +11,6 @@
 ###                          Samarth Mathur, PhD                     	###
 ###                        The Ohio State University                 	###
 ###                                                                     ###
-###     Date Created: 09/02/22                  Last Modified: 09/22/23 ###
 ###########################################################################
 ###########################################################################
 ###                     01_snpEff.sh    		                    	###
@@ -19,13 +18,13 @@
 
 cd $SLURM_SUBMIT_DIR
 module purge
-module load snpeff
+module load java/21.0.2
 module load vcftools
 
 # dirs
 MAINDIR="/fs/ess/scratch/PAS1533/smathur/genRes"
 OUTDIR="/fs/ess/scratch/PAS1533/smathur/genRes/annoVar/snpeff"
-SNPEFF="/usr/local/snpeff/4.2/snpEff"
+SNPEFF="/fs/ess/scratch/PAS1533/smathur/genRes/annoVar/snpeff/snpEff"
 
 # SNPeff
 
@@ -41,65 +40,58 @@ SNPEFF="/usr/local/snpeff/4.2/snpEff"
 # 5. Build the database
 
 cd $OUTDIR
-#cp $SNPEFF/snpEff.config ./
+# cp $SNPEFF/snpEff.config ./
 
-# java -jar $SNPEFF/snpEff.jar build \
+# $SNPEFF/exec/snpeff build -noCheckCds -noCheckProtein \
 # -c snpEff.config -gff3 -v scat &> build.logfile.txt
 
 # If the database builds without error, you should see snpEffectPredictor.bin inside your scat folder
 
 # Step6: Annotate your variants
 
-# java -jar $SNPEFF/snpEff.jar ann \
-# -stats -c snpEff.config \
-# -no-downstream -no-intergenic -no-intron -no-upstream -no-utr -v scat \
-# $MAINDIR/vcf/final172.allchr.finalSNPs.vcf.gz \
-# > final172.allchr.SNPEff.vcf
+$SNPEFF/exec/snpeff ann \
+-stats -c snpEff.config \
+-no-downstream -no-intergenic -no-intron -no-upstream -no-utr -v scat \
+$MAINDIR/vcf/final152.allchr.finalSNPs.vcf.gz \
+> final152.allchr.SNPEff.vcf
 
 
 # Step7: Use SNPSift to extract different synonymous and nonsynonymous SNPs
 # see: https://pcingola.github.io/SnpEff/snpeff/inputoutput/#eff-field-vcf-output-files
 
 
-# cat final172.allchr.SNPEff.vcf | \
-# java -jar $SNPEFF/SnpSift.jar filter "( EFF[*].EFFECT = 'missense_variant' )" | \
-# grep -v "WARNING" > final172.allchr.missense.SNPEff.vcf
+cat final152.allchr.SNPEff.vcf | \
+java -jar $SNPEFF/SnpSift.jar filter "( EFF[*].EFFECT = 'missense_variant' )" | \
+grep -v "WARNING" > final152.allchr.missense.SNPEff.vcf
 
-# cat final172.allchr.SNPEff.vcf | \
-# java -jar $SNPEFF/SnpSift.jar filter "( EFF[*].EFFECT = 'synonymous_variant' )" | \
-# grep -v "WARNING" > final172.allchr.Syn.SNPEff.vcf
+cat final152.allchr.SNPEff.vcf | \
+java -jar $SNPEFF/SnpSift.jar filter "( EFF[*].EFFECT = 'synonymous_variant' )" | \
+grep -v "WARNING" > final152.allchr.Syn.SNPEff.vcf
 
-# # high impact variants (LoF)
-# cat final172.allchr.SNPEff.vcf | \
-# java -jar $SNPEFF/SnpSift.jar filter "( EFF[*].IMPACT = 'HIGH' )" | \
-# grep -v "WARNING" > final172.allchr.nonsense.SNPEff.vcf
+# high impact variants (LoF)
+cat final152.allchr.SNPEff.vcf | \
+java -jar $SNPEFF/SnpSift.jar filter "( EFF[*].IMPACT = 'HIGH' )" | \
+grep -v "WARNING" > final152.allchr.nonsense.SNPEff.vcf
 
 
-# for type in nonsense Syn missense
-# do
-# 	grep -v "#" final172.allchr.$type.SNPEff.vcf \
-# 	| cut -f8 |  cut -f16 -d ";" | grep -v "WARNING" > $MAINDIR/sites/final172.$type.ann.txt
+for type in nonsense Syn missense
+do
+	grep -v "#" final152.allchr.$type.SNPEff.vcf \
+	| cut -f8 |  cut -f16 -d ";" | grep -v "WARNING" > $MAINDIR/sites/final152.$type.ann.txt
 
-# 	grep -v "#" final172.allchr.$type.SNPEff.vcf \
-# 	| grep -v "WARNING" | cut -f1,2  > $MAINDIR/sites/final172.$type.pos.txt
+	grep -v "#" final152.allchr.$type.SNPEff.vcf \
+	| grep -v "WARNING" | cut -f1,2  > $MAINDIR/sites/final152.$type.pos.txt
 
-# done
+done
 
 # Combine missense and nonsense into non-synonymous mutations
 
-# cd  $MAINDIR/sites/
-# cat final172.nonsense.pos.txt final172.missense.pos.txt > final172.nonSyn.pos.txt
+cd  $MAINDIR/sites/
+cat final152.nonsense.pos.txt final152.missense.pos.txt > final152.nonSyn.pos.txt
 
 # Get nonSyn vcf
 cd $OUTDIR
-vcftools --vcf final172.allchr.SNPEff.vcf \
---positions $MAINDIR/sites/final172.nonSyn.pos.txt \
+vcftools --vcf final152.allchr.SNPEff.vcf \
+--positions $MAINDIR/sites/final152.nonSyn.pos.txt \
 --recode --recode-INFO-all \
---out final172.allchr.nonSyn.SNPEff
-
-# After filtering, kept 69,262 out of a possible 18,923,075 Sites
-
-### SYNONYMOUS = 93,195
-### MISSENSE = 68,041
-### NONSENSE = 1,221
-### NONSYNONYMOUS = 69,262
+--out final152.allchr.nonSyn.SNPEff

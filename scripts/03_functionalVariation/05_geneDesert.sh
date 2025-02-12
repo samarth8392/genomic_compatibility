@@ -11,7 +11,6 @@
 ###                          Samarth Mathur, PhD                     	###
 ###                        The Ohio State University                 	###
 ###                                                                     ###
-###     Date Created: 09/02/22                  Last Modified: 12/21/23 ###
 ###########################################################################
 ###########################################################################
 ###                     04_upper10.sh              						###
@@ -56,12 +55,12 @@ cd $OUTDIR
 
 gff2bed < $REFDIR/annotations/Scate_HiC.revisedgenome.all_justgenes.gff > Scate_HiC.revisedgenome.all_justgenes.bed
 gff2bed < $REFDIR/annotations/Scate_HiC.revisedgenome.all_justCDS.gff > Scate_HiC.revisedgenome.all_justCDS.bed
-vcf2bed < $MAINDIR/vcf/onlyScat.final172.phasedSNPs.vcf > onlyScat.final172.phasedSNPs.bed
-sort-bed onlyScat.final172.phasedSNPs.bed > onlyScat.final172.phasedSNPs.sorted.bed
+vcf2bed < $MAINDIR/vcf/final152.allchr.finalSNPs.vcf > onlyScat.final152.phasedSNPs.bed
+sort-bed onlyScat.final152.phasedSNPs.bed > onlyScat.final152.phasedSNPs.sorted.bed
 sort-bed Scate_HiC.revisedgenome.all_justgenes.bed > Scate_HiC.sortedgff_justgenes.bed
 
-closest-features --delim '\t' --dist onlyScat.final172.phasedSNPs.sorted.bed Scate_HiC.sortedgff_justgenes.bed \
-> onlyScat.final172.phasedSNPs.distance2genes_tab.txt
+closest-features --delim '\t' --dist onlyScat.final152.phasedSNPs.sorted.bed Scate_HiC.sortedgff_justgenes.bed \
+> onlyScat.final152.phasedSNPs.distance2genes_tab.txt
 
 # Some markers will be upstream from a gene but there will be no genes downstream (or vice versa).  If we ignore this 
 # we can end up incorporating a lot of SNPs that are at the extreme edge of a scaffold.  This makes me nervous because 
@@ -71,7 +70,7 @@ closest-features --delim '\t' --dist onlyScat.final172.phasedSNPs.sorted.bed Sca
 
 # The following selects for SNPs that have a SNP both upstream and downstream 
 
-cat onlyScat.final172.phasedSNPs.distance2genes_tab.txt | \
+cat onlyScat.final152.phasedSNPs.distance2genes_tab.txt | \
     awk '{if ($194!~/NA/) print $0;}' | \
     awk '{if ($195!~/NA/) print $0;}' \
     > distance2genes_noNA_clean.txt
@@ -117,14 +116,14 @@ write.table(snps, "genedeserts_snps.bed",quote=F,row.names=F, col.names=F)
 cd $OUTDIR
 
 #final 152
-vcftools --vcf $MAINDIR/vcf/onlyScat.final172.phasedSNPs.vcf \
+vcftools --vcf $MAINDIR/vcf/final152.allchr.finalSNPs.vcf \
 --recode --recode-INFO-all \
 --keep $MAINDIR/lists/final152.sampleList \
---bed beds/genedeserts_snps.bed --out vcf/onlyScat.final152.phasedSNPs.geneDes
+--bed beds/genedeserts_snps.bed --out vcf/onlyScat.final152.geneDes
 
 
 #onlyOH
-vcftools --vcf $MAINDIR/vcf/onlyScat.final172.phasedSNPs.vcf \
+vcftools --vcf $MAINDIR/vcf/final152.allchr.finalSNPs.vcf \
 --recode --recode-INFO-all \
 --keep $MAINDIR/lists/onlyOH.sampleList \
---bed beds/genedeserts_snps.bed --out vcf/onlyScat.onlyOH.phasedSNPs.geneDes
+--bed beds/genedeserts_snps.bed --out vcf/onlyScat.onlyOH.geneDes
