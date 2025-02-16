@@ -1,0 +1,2212 @@
+---
+title: "Genomic evaluation of genetic augmentation options in an endangered rattlesnake"
+title-block-banner: true
+author:
+  - name: Samarth Mathur
+    orcid: 0000-0002-6446-5718
+    email: mathur.112@osu.edu
+    affiliations: Department of Evolution, Ecology and Organismal Biology, The Ohio State University
+  - name: H. Lisle Gibbs
+    email: gibbs.128@osu.edu
+    affiliations: Department of Evolution, Ecology and Organismal Biology, The Ohio State University
+date: '`r lubridate::today()`'
+format:
+  html:
+    code-fold: true
+    code-tools: true
+    code-line-numbers: true
+    embed-resources: true
+    html-math-method: mathml
+    theme: 
+      - pulse
+      - resources/custom.scss
+    page-layout: full
+    grid: 
+      margin-width: 250px
+  
+output:
+  html_document:
+    df_print: paged
+  header-includes: 
+    \usepackage{float}
+    \usepackage{mathtools}
+params:
+  workdir: "/Users/batcomputer/Documents/Postdoc_research/GeneticRescue/"
+  outdir: "/Users/batcomputer/Documents/Postdoc_research/GeneticRescue/results"
+  resources: "/Users/batcomputer/Documents/Postdoc_research/GeneticRescue/metadata"
+bibliography: resources/references.bib
+---
+
+
+\flushleft
+
+```{r setup, message = FALSE, warning = FALSE, echo=FALSE}
+require("knitr")
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, fig.pos="H", fig.width=12, fig.height=9)
+path = dirname(params$outdir)
+knitr::opts_knit$set(root.dir=path)
+```
+
+
+
+```{r libraries, echo=FALSE}
+# import packages -------------------------------------------------------------------------------
+library(tidyverse)
+library(plyr)
+library(dplyr)
+library(DT)
+library(ggpubr) #pretty graphs
+library(ggrepel) #connectors to data points
+library(devtools) #load scripts from github
+library(cowplot) #combine plots for PCAtools
+library(ggplotify) #combine plots for PCAtools
+library("pheatmap")
+library("RColorBrewer")
+library("ggsci")
+library(reshape2)
+library(kableExtra)
+library(bslib)
+library(ggplot2)
+library(glue)
+library(here)
+library(htmltools)
+library(lubridate)
+library(plotly)
+library(purrr)
+library(readr)
+library(rlang)
+library(scales)
+library(stringr)
+library(tidyr)
+library(ape)
+library(writexl)
+library(sf)
+library(rnaturalearth)
+library(usmap)
+library(tigris)
+library(basemaps)
+library(gridExtra)
+library(ggrain)
+library(hierfstat)
+library(adegenet)
+library(vcfR)
+
+workdir <- params$workdir
+outdir <- params$outdir
+resources <- params$resources
+```
+
+```{r funcs&Vars, echo=FALSE}
+create_dt <- function(x,caption=caption){
+  DT::datatable(x,
+                extensions = 'Buttons',rownames=F,
+                options = list(dom = 'Blfrtip',
+                               buttons = c('copy', 'csv', 'excel'),
+                               pageLength = 10,
+                               lengthMenu = list(c(10,15,-1),
+                                                 c(10,15,"All")),
+                               scrollX=T, 
+                               scrollY=450),
+                caption=caption)
+}
+
+remove_outliers <- function(x) {
+  lower_bound <- quantile(x, 0.05)  # 5th percentile
+  upper_bound <- quantile(x, 0.95)  # 95th percentile
+  return(between(x, lower_bound, upper_bound))
+}
+  
+
+
+
+```
+
+
+## Abstract
+
+*Last Updated: 09/10/24*
+
+Genetic augmentation is proposed to mitigate genetic erosion in small populations of endangered species yet empirical evaluation of different options for potential donor populations is rare. Here, we combine measures of functional genomic variation with new metrics for assessing genetic compatibility based on variant identity to evaluate proposals to augment Eastern Massasauaga Rattlesnake (*Sistrutus catenatus*) populations in the state of Ohio, USA. We used deleterious mutations and adaptive genetic variation as the two components of functional genomic variation to assess three key aspects of genetic compatibility – (a) introduction of novel variants, and (b) masking or unmasking of existing deleterious variants, and (c) evidence for local adaptation leading to outbreeding depression for two potential donor populations and three potential recipient populations. New identity-based measures of compatibility show that the main potential impact of donor individuals is to introduce novel deleterious variants and to a lesser extent novel adaptive variants into each recipient populations. Donors had only a minor impact in terms of masking existing deleterious variants. Both impacts were similar but not identical between the two donor populations. Finally, only ~ 7% of adaptive variants show evidence for local adaptation arguing that the potential impact of outbreeding depression will be small. Together these results draw attention to the importance of assessing the potential impact of both ‘good’ versus ‘bad’ genetic variants using identity-based metrics in augmentation efforts and suggest that the net effect of proposed augmentation in these snakes may be to decrease absolute levels of genetic load in small recipient populations.  
+
+
+### Sample summary
+
+```{r}
+# load sampleInfo and locations -------------------------------------------------------------------------------
+
+sampleInfo <- read.csv(paste(resources,"final172.popInfo.csv",sep="/"),header = T) %>%
+  filter(!(Pop %in% c("MIOK", "OJIB", "STER", "WAIN", "WITR")))
+
+sampleInfo$Pop <- factor(sampleInfo$Pop,levels=c("CEBO","PRDF","SPVY",
+                                                 "KLDR","WLRD",
+                                                 "BERG","BPNP","CCRO","GRLL","JENN","KBPP","MOSQ","ROME","SSSP"))
+
+sampleInfo$Label <- factor(sampleInfo$Label, levels = c("Recipient1","Recipient2","Recipient3",
+                                                        "Donor1","Donor2",
+                                                        "Other"))
+
+siteLocations <- read.csv(paste(resources,"sample_locations_all22.csv",sep="/"),header = T) %>%
+  rename("Pop" = "Location") %>%
+  filter(!(Pop %in% c("MIOK", "OJIB", "STER", "WAIN", "WITR")))
+
+siteLocations$Pop <- factor(siteLocations$Pop,levels=c("CEBO","PRDF","SPVY",
+                                                 "KLDR","WLRD",
+                                                 "BERG","BPNP","CCRO","GRLL","JENN","KBPP","MOSQ","ROME","SSSP"))
+
+siteLocations$Label <- factor(siteLocations$Label, levels = c("Recipient1","Recipient2","Recipient3",
+                                                        "Donor1","Donor2",
+                                                        "Other"))
+sampleInfo <- sampleInfo %>%
+  left_join(siteLocations,by=c("Pop")) %>%
+  select(!c(Label.y,LabelCol.y)) %>%
+  rename("Label" = "Label.x") %>%
+  rename("LabelCol" = "LabelCol.x")
+
+
+sampleSites <- as.data.frame(table(sampleInfo$Pop)) %>%
+  rename("Pop" = "Var1") %>%
+  rename("N" = "Freq") %>%
+  left_join(siteLocations, by="Pop")
+
+sampleSites %>%
+  select(-c(Species,LabelCol)) %>%
+  arrange(Pop) %>%
+  kbl(caption = "Summary of study sites (N=14)") %>%
+  kable_classic(full_width = F, html_font = "Arial")
+  
+#sampleInfo %>%
+#  select(-c(PopCol,Species,Label,LabelCol,Latitude,Longitude)) %>%
+#  create_dt(caption="Sample Info (N= 152)")
+
+```
+
+![Sampling sites and potential donor and recipient sites for genetic rescue of Eastern massasauga rattlesnakes (*Sistrurus catenatus*). (A) 152 whole genomes were analyzed to identify genome-wide SNPs in different S. catenatus populations across the species range. (B) The goal is to infer genomic compatibilities among different potential donor and recipient populations in the state of Ohio based on genomic variants. (C)  A schematic showing different genetic rescue scenarios that are likely possible based on environmental and policy reasons. Between the two potential donor populations, KLDR is bigger with larger effective population sizes and likely to have more individuals for rescue efforts. Population labels in red indicate the potential recipient populations, green are potential donor sites, and all other populations are labelled in blue.](/Users/mathur.112/Documents/Postdoc_research/GeneticRescue/results/figures/jpegs/Figure1.jpg){#fig-map}
+
+### Realized load and Adaptive diversity
+
+```{r, results='hide'}
+#| label: fig-functional
+#| fig-cap: "Realized genetic load and adaptive diversity in different S. catenatus populations.  Realized load was measured as the number of SNPs within an individual that are homozygote for the (A) Loss of Function (LoF) allele and (B) missense allele labelled as damaging by PROVEAN.  (C) Adaptive diversity was measured as the mean per-site pairwise non-synonymous nucleotide diversity in the protein coding regions of genes in the upper 10% of direction of selection (DoS) distribution (upper10%, Mathur et al. 2023). Error bars show 1SD. Red = Recipients; Green = Donors; Blue = Others."
+#| fig-height: 15
+#| fig-width: 18
+
+
+df.Load <- NULL
+genoDir <- paste(outdir,"geneticLoad","geno",sep="/")
+
+for (pop in sampleSites$Pop)
+{
+  for (mut in c("deleterious","nonsense"))
+  {
+    geno <- read.table(paste(genoDir,"/",pop,".",mut,".GT.FORMAT",sep=""), header = T)
+    inds <- colnames(geno)[-c(1,2)]
+    N <- ncol(geno)-2
+    L <- nrow(geno)
+    print(L)
+    for (j in 1:N) # per-ind genotypes
+    {
+      gt <- geno[,(j+2)]
+      het <- length(which(gt == "0|1")) + length(which(gt == "1|0"))+
+           length(which(gt == "0/1")) + length(which(gt == "1/0"))
+    
+      hom <- length(which(gt == "1/1")) + length(which(gt == "1|1"))
+    
+      df <- data.frame(SampleID=inds[j],Pop=pop,Mutation=mut,loadM=het, loadR=hom)
+      df.Load <- rbind(df.Load,df)
+    }
+  }
+}
+
+df.Load$Pop <- factor(df.Load$Pop,levels=c("CEBO","PRDF","SPVY",
+                                                 "KLDR","WLRD",
+                                                 "BERG","BPNP","CCRO","GRLL","JENN","KBPP","MOSQ","ROME","SSSP"))
+
+            
+p1 <- df.Load %>%
+  left_join(sampleSites,by="Pop") %>%
+  filter(Mutation == "nonsense") %>%
+  ggplot(aes(x=Pop,y=loadR,fill=Pop))+
+  geom_boxplot(alpha = 0.5,outlier.shape = NA,position = "identity",width = 0.7)+
+  geom_point(position=position_jitterdodge(), size=3,aes(color=Pop),color="black",pch=21)+
+  labs(x="Pop", y = expression(paste(L[realized])))+
+  theme_bw(base_size = 22)+
+  scale_y_continuous(labels =comma, breaks = pretty(df.Load$loadR[which(df.Load$Mutation=="nonsense")], n = 10))+
+  scale_fill_manual(values = sampleSites$LabelCol)+
+  scale_color_manual(values = sampleSites$LabelCol)+
+  theme(axis.title.x=element_blank(),
+        axis.text.x = element_text(size = 12),
+        legend.title=element_blank(),
+        legend.position = "none")+
+  ggtitle("(A) Realized load (LoF)")
+  
+p2 <- df.Load %>%
+  left_join(sampleSites,by="Pop") %>%
+  filter(Mutation == "deleterious") %>%
+  ggplot(aes(x=Pop,y=loadR,fill=Pop))+
+  geom_boxplot(alpha = 0.5,outlier.shape = NA,position = "identity",width = 0.7)+
+  geom_point(position=position_jitterdodge(), size=3,aes(color=Pop),color="black",pch=21)+
+  labs(x="Pop", y = expression(paste(L[realized])))+
+  theme_bw(base_size = 22)+
+  scale_y_continuous(labels =comma, breaks = pretty(df.Load$loadR[which(df.Load$Mutation=="deleterious")], n = 10))+
+  scale_fill_manual(values = sampleSites$LabelCol)+
+  scale_color_manual(values = sampleSites$LabelCol)+
+  theme(axis.title.x=element_blank(),
+        legend.title=element_blank(),
+        axis.text.x = element_text(size = 12),
+        legend.position = "none")+
+  ggtitle("(B) Realized load (Damaging Missense)")
+
+p3 <- df.Load %>%
+  left_join(sampleSites,by="Pop") %>%
+  filter(Mutation == "nonsense") %>%
+  ggplot(aes(x=Pop,y=loadM,fill=Pop))+
+  geom_boxplot(alpha = 0.5,outlier.shape = NA,position = "identity",width = 0.7)+
+  geom_point(position=position_jitterdodge(), size=3,aes(color=Pop),color="black",pch=21)+
+  labs(x="Pop", y = expression(paste(L[masked])))+
+  theme_bw(base_size = 22)+
+  scale_y_continuous(labels =comma, breaks = pretty(df.Load$loadM[which(df.Load$Mutation=="nonsense")], n = 10))+
+  scale_fill_manual(values = sampleSites$LabelCol)+
+  scale_color_manual(values = sampleSites$LabelCol)+
+  theme(axis.title.x=element_blank(),
+        axis.text.x = element_text(size = 12),
+        legend.title=element_blank(),
+        legend.position = "none")+
+  ggtitle("(C) Masked load (LoF)")
+  
+
+p4 <- df.Load %>%
+  left_join(sampleSites,by="Pop") %>%
+  filter(Mutation == "deleterious") %>%
+  ggplot(aes(x=Pop,y=loadM,fill=Pop))+
+  geom_boxplot(alpha = 0.5,outlier.shape = NA,position = "identity",width = 0.7)+
+  geom_point(position=position_jitterdodge(), size=3,aes(color=Pop),color="black",pch=21)+
+  labs(x="Pop", y = expression(paste(L[masked])))+
+  theme_bw(base_size = 22)+
+  scale_y_continuous(labels =comma, breaks = pretty(df.Load$loadM[which(df.Load$Mutation=="deleterious")], n = 10))+
+  scale_fill_manual(values = sampleSites$LabelCol)+
+  scale_color_manual(values = sampleSites$LabelCol)+
+  theme(axis.title.x=element_blank(),
+        legend.title=element_blank(),
+        axis.text.x = element_text(size = 12),
+        legend.position = "none")+
+  ggtitle("(D) Masked load (Damaging Missense)")
+
+
+pA <- grid.arrange(p1,p2,p3,p4, ncol=2)
+ggsave(paste(outdir,"figures","Load_estimates.pdf",sep="/"), pA, width = 18, height = 12)
+
+# write.csv(df.Load,paste(outdir,"tables","df.Load.csv", sep="/"),quote=F,row.names=F)
+
+
+
+#df.Load <- read.csv(paste(outdir,"tables","df.Load.csv",sep="/"),header = T)
+
+# calculate adaptive diversity-------------------------------------------
+up10 <- paste(outdir,"upper10","pi",sep="/")
+cols <- c("Region","Chr","Center","tW","tP","tF","tH","tL","Tajima", "fuf","fud","fayh","zeng","nSites")
+
+df.pi.u10 <- NULL
+df.pi.u10.full <- NULL
+
+for (pop in sampleSites$Pop)
+{
+  pi_site <- read.table(paste(up10,"/",pop,".upper10_missense.pestPG",sep=""), header = F)
+  colnames(pi_site) <- cols
+  
+  pi_site <- pi_site %>%
+    filter(nSites != 0) %>%
+    select(Chr,tP)
+  
+  pi_cds <- read.table(paste(up10,"/",pop,".upper10_justCDS.pestPG",sep=""), header = F)
+  colnames(pi_cds) <- cols
+  
+  pi_cds <- pi_cds %>%
+    filter(nSites != 0) %>%
+    select(Chr,nSites)
+  
+  
+  pi <- inner_join(pi_site,pi_cds,by="Chr") %>%
+    mutate(pi_u10=tP/nSites)
+  
+  
+  df <- data.frame(Pop=pop,mean_pi_u10=mean(pi$pi_u10),sd_pi_u10=sd(pi$pi_u10))
+  df.full <- data.frame(Pop=pop,pi_u10=pi$pi_u10)
+  df.pi.u10.full <- rbind(df.pi.u10.full,df.full)
+  df.pi.u10 <- rbind(df.pi.u10,df)
+}
+
+df.pi.u10$Pop <- factor(df.pi.u10$Pop, levels=rev(c("CEBO","PRDF","SPVY",
+                                                 "KLDR","WLRD",
+                                                 "BERG","BPNP","CCRO","GRLL","JENN","KBPP","MOSQ","ROME","SSSP")))
+
+df.pi.u10 <- df.pi.u10 %>%
+  left_join(sampleSites,by="Pop")
+
+p5 <- df.pi.u10 %>%
+  ggplot(aes(x=Pop, y=mean_pi_u10, fill=Pop)) + 
+  geom_bar(stat="identity", color="black", position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean_pi_u10-sd_pi_u10, ymax=mean_pi_u10+sd_pi_u10), width=0.3,linewidth=0.5,
+                position=position_dodge(0.9))+
+  theme_classic(base_size = 22)+
+  scale_fill_manual(values = rev(alpha(df.pi.u10$LabelCol,alpha=0.7)))+
+  scale_y_continuous(labels =comma, breaks= seq(0, 0.00085, by = 0.0001))+
+  labs(y=expression(paste("Adaptive diversity")))+ coord_flip()+
+  theme(axis.title.y=element_blank(),
+        legend.title=element_blank(),
+        legend.position = "none")+
+  ggtitle("Adaptive diversity")
+
+Fig2 <- grid.arrange(p1,p2,p5, layout_matrix = matrix(c(1, 2, 3, 3),nrow = 2, byrow = TRUE))
+Fig2
+#ggsave(paste(outdir,"figures","adaptive_diversity.pdf",sep="/"), p5, width = 12, height = 6)
+
+# write.csv(df.pi.u10,paste(outdir,"tables","df.pi.u10.csv", sep="/"),quote=F,row.names=F)
+```
+
+```{r}
+df.meanLoad <- list()
+
+for (mut in c("nonsense", "deleterious"))
+{
+  meanLoad <- df.Load %>%
+    filter(Mutation == mut) %>%
+  group_by(Pop) %>%
+  dplyr::summarise(meanLoadM = mean(loadM),meanLoadR=mean(loadR),
+                   sdLoadM = sd(loadM),sdLoadR=sd(loadR)) %>%
+  as.data.frame()
+  
+  df.meanLoad[[mut]] <- meanLoad %>%
+  mutate(LoadM = paste(round(meanLoadM,2),"+/-",round(sdLoadM,2)),
+         LoadR = paste(round(meanLoadR,2),"+/-",round(sdLoadR,2))) %>%
+  select(Pop,LoadM,LoadR) %>%
+  arrange(Pop)
+}
+
+df.meanLoad[["Adaptive"]] <- df.pi.u10 %>%
+  mutate(Adaptive_Diversity=paste(formatC(mean_pi_u10, format = "e", digits = 3), "+/-",
+                                formatC(sd_pi_u10, format = "e", digits = 3))) %>%
+  select(Pop,Adaptive_Diversity) %>%
+  arrange(Pop)
+
+
+
+write_xlsx(df.meanLoad,path = paste(outdir,"tables","mean_functional_variation.xlsx", sep="/"))
+
+```
+
+#### Statistical inferences
+
+```{r}
+
+plots_list <- list()
+pval_list <- list()
+
+for (mut in c("nonsense","deleterious"))
+{
+  df <- df.Load %>%
+  filter(Mutation == mut) 
+  test.loadM <- pairwise.wilcox.test(df$loadM, df$Pop,p.adjust.method = "fdr")
+  test.loadR <- pairwise.wilcox.test(df$loadR, df$Pop,p.adjust.method = "fdr")
+  
+  p.loadM <- test.loadM$p.value
+  p.loadR <- test.loadR$p.value
+  
+  p.loadM.mat <- matrix(p.loadM, nrow = length(unique(df$Pop))-1, byrow = TRUE)
+  p.loadR.mat <- matrix(p.loadM, nrow = length(unique(df$Pop))-1, byrow = TRUE)
+  
+  df1.pval <- p.loadM %>%
+    as.data.frame() %>%
+    rownames_to_column(var=" ")
+  
+  df2.pval <- p.loadR %>%
+    as.data.frame() %>%
+    rownames_to_column(var=" ")
+  
+  pval_list[[paste(mut,"loadM",sep="-")]] <- df1.pval
+  pval_list[[paste(mut,"loadR",sep="-")]] <- df2.pval
+  
+  mat1 <- df1.pval %>%
+    column_to_rownames(" ") %>%
+    as.matrix()
+  
+  row_counts <- rowSums(!is.na(mat1))
+  col_counts <- colSums(!is.na(mat1))
+  
+  new_order1 <- names(sort(row_counts + col_counts, decreasing = TRUE))
+  new_order1 <- intersect(new_order1, intersect(rownames(mat1), colnames(mat1)))
+  mat1_ordered <- mat1[new_order1, new_order1]
+  melted_mat1 <- melt(mat1_ordered)
+  
+  
+  p1 <- ggplot(melted_mat1, aes(x=Var2, y=Var1, fill=value)) +
+  geom_tile(color = "white") +
+  geom_tile(data = subset(melted_mat1, value < 0.05), 
+            color = "black", linewidth = 0.5, fill = NA) +
+  scale_fill_gradient(low = "darkorchid3", high = "white", na.value = "gray40") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.text.y = element_text(angle = 0, hjust = 1),
+        panel.border = element_rect(color = "black", fill = NA, linewidth = 1)) +
+  labs(x = "", y = "", fill = "p-value") +
+  coord_fixed() +
+    ggtitle(paste("(A) Masked Load", mut))
+  
+  mat2 <- df2.pval %>%
+    column_to_rownames(" ") %>%
+    as.matrix()
+  
+  row_counts <- rowSums(!is.na(mat2))
+  col_counts <- colSums(!is.na(mat2))
+  
+  new_order2 <- names(sort(row_counts + col_counts, decreasing = TRUE))
+  new_order2 <- intersect(new_order2, intersect(rownames(mat2), colnames(mat2)))
+  mat2_ordered <- mat2[new_order2, new_order2]
+  melted_mat2 <- melt(mat2_ordered)
+  
+  
+  p2 <- ggplot(melted_mat2, aes(x=Var2, y=Var1, fill=value)) +
+  geom_tile(color = "white") +
+  geom_tile(data = subset(melted_mat2, value < 0.05), 
+            color = "black", linewidth = 0.5, fill = NA) +
+  scale_fill_gradient(low = "darkorchid3", high = "white", na.value = "gray40") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.text.y = element_text(angle = 0, hjust = 1),
+        panel.border = element_rect(color = "black", fill = NA, linewidth = 1)) +
+  labs(x = "", y = "", fill = "p-value") +
+  coord_fixed() +
+    ggtitle(paste("(B) Realized Load", mut))
+  
+ 
+  plots_list[[mut]] <- ggarrange(p1,p2,ncol = 2,common.legend=T,legend="right")
+
+}
+
+plots_list
+
+test.pi10 <- pairwise.wilcox.test(df.pi.u10.full$pi_u10, df.pi.u10.full$Pop,p.adjust.method = "fdr")
+
+pval_list[["Adaptive"]] <-  test.pi10$p.value %>%
+    as.data.frame() %>%
+    rownames_to_column(var=" ")
+write_xlsx(pval_list,path = paste(outdir,"tables","pvalue_loadADaptive.xlsx",sep="/"))
+
+```
+
+
+
+
+### Average number of functional mutations per genome for each population
+
+```{r}
+
+df.muts <- df.Load %>%
+  mutate(TotalMuts = loadM + loadR) %>%
+  select(SampleID,Pop,Mutation,TotalMuts)
+
+df.add <- NULL
+for (pop in sampleSites$Pop)
+{
+  geno <- don.geno <- read.table(paste(outdir,"/upper10/geno/",pop,".GT.FORMAT",sep=""), header = T)
+  inds <- colnames(geno)[-c(1,2)]
+  N <- ncol(geno)-2
+  L <- nrow(geno)
+  for (j in 1:N) # per-ind genotypes
+  {
+    gt <- geno[,(j+2)]
+    het <- length(which(gt == "0|1")) + length(which(gt == "1|0"))+
+         length(which(gt == "0/1")) + length(which(gt == "1/0"))
+    
+    hom <- length(which(gt == "1/1")) + length(which(gt == "1|1"))
+    
+      df <- data.frame(SampleID=inds[j],Pop=pop,Mutation="adaptive",TotalMuts=het+hom)
+      df.add <- rbind(df.add,df)
+  }
+}
+
+df.muts <- rbind(df.muts,df.add)
+write.csv(df.muts,paste(outdir,"tables","df.muts.csv", sep="/"),quote=F,row.names=F)
+
+
+df_summary <- df.muts %>%
+  group_by(Pop, Mutation) %>%
+  summarise(
+    mean_sd = sprintf("%.2f +/- %.2f", mean(TotalMuts), sd(TotalMuts)),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Mutation,
+    values_from = mean_sd) %>%
+  arrange(Pop)  %>%
+  as.data.frame()
+
+df_summary2 <- df.muts %>%
+  filter(Pop %in% c("CEBO","PRDF","SPVY")) %>%
+  group_by(Mutation) %>%
+  summarise(
+    mean_sd = sprintf("%.2f +/- %.2f", mean(TotalMuts), sd(TotalMuts)),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Mutation,
+    values_from = mean_sd) %>%
+  as.data.frame()
+
+
+df_summary %>%
+kbl(caption = "Average number of functional mutations per genome for each population") %>%
+  kable_classic(full_width = F, html_font = "Arial")
+
+write_xlsx(df_summary,paste(outdir,"tables","mean_totalMutations.xlsx", sep="/"))
+
+
+p.totalMuts <- list()
+
+for (mut in c("nonsense","deleterious","adaptive"))
+{
+  df <- df.muts %>%
+    filter(Mutation == mut)
+  
+  test.totalMuts <- pairwise.wilcox.test(df$TotalMuts, df$Pop,p.adjust.method = "fdr")
+  
+  p.totalMuts[[mut]] <- test.totalMuts$p.value %>%
+    as.data.frame() %>%
+    rownames_to_column(var=" ")
+}
+
+write_xlsx(p.totalMuts,paste(outdir,"tables","pvalue_totalMutations.xlsx", sep="/"))
+
+
+```
+
+
+
+
+### Genetic Compatibility
+
+Genomic compatibility is defined between a Donor (D) and Recipient (R) population by comparing the functional genetic variation between each pair of donor ($d_1$, $d_2$,…,$d_i$) and recipient ($r_1$,$r_2$,…,$r_j$) genomes. To estimate genetic compatibility between a donor genome and a recipient genome based on their genetic load makeup, we defined three metrics: Mutations added ($M_{add}$), Mutations masked ($M_{mask}$), and Mutations unmasked ($M_{unmask}$).
+
+
+#### Mutations added ($M_{add}$)
+
+Conceptually, $M_{add}$ measures the number of loci where the donor genome carries a derived functional allele but is missing from the recipient genome. Thus, $M_{add}$ quantifies the amount of new functional mutations (deleterious or adaptive) that a donor genome can theoretically add in the next generation when crossed with recipient genome.
+
+To measure $M_{add}$, we first compared, at a given locus $l$, the genotype of both the donor ($g_l^{d}$) and the recipient genome ($g_l^{r}$). If the functional allele (either deleterious or adaptive) is missing from the recipient genome, i.e., $g_l^{r} = 0|0$ but is present in the donor genome, i.e., $g_l^{d} \ne 0|0$ then, we count that locus as a mutation added ($m_a(d,r)$).
+
+Thus, 
+
+
+$\textbf{M}_{add} = \sum^L_{l=1} m_a(d,r)$
+
+where $L$ are the total number of functional loci where $g_l^{𝑑}\neq 0|0 \text{ & } g_l^{r}=0|0$.
+
+
+```{r}
+# L_add = Number of deleterious (and LoF) mutations unique to the donor genome (absent in recipient)
+
+l_add.full <- NULL
+L_add <- NULL
+for (pop1 in sampleSites$Pop)
+{
+ for (pop2 in sampleSites$Pop)
+ {
+   if (pop1 != pop2)
+   {
+      for (mut in c("deleterious","nonsense"))
+      {
+        don.geno <- read.table(paste(genoDir,"/",pop1,".",mut,".GT.FORMAT",sep=""), header = T)
+        inds1 <- colnames(don.geno)[-c(1,2)]
+        N1 <- ncol(don.geno)-2
+        L1 <- nrow(don.geno)
+       
+        rec.geno <- read.table(paste(genoDir,"/",pop2,".",mut,".GT.FORMAT",sep=""), header = T)
+        inds2 <- colnames(rec.geno)[-c(1,2)]
+        N2 <- ncol(rec.geno)-2
+        L2 <- nrow(rec.geno)
+       
+        for (j in 1:N1)
+        {
+          gt.don <- don.geno[,c(1:2,(j+2))]
+          for (k in 1:N2)
+          {
+            gt.rec <- rec.geno[,c(1:2,(k+2))]
+            gt.don.rec <- inner_join(gt.don,gt.rec,by=c("CHROM","POS"))
+           
+            colnames(gt.don.rec)[3:4] <- c("Donor","Recipient")
+           
+            l_add <- gt.don.rec %>%
+             filter(Donor != "0|0") %>%
+             filter(Recipient == "0|0")
+            
+            l_add.full <- rbind(l_add.full,l_add)
+           
+            df <- data.frame(Donor=inds1[j],Recipient=inds2[k],DonPop=pop1,RecPop=pop2,
+                            Mutation=mut, L_add=dim(l_add)[1])
+            L_add <- rbind(L_add,df)
+           }
+        }
+      }
+    }
+  }
+}
+
+#write.csv(L_add,paste(outdir,"tables","L_add.csv",sep="/"),quote=F,row.names=F)
+
+L_add <- read.csv(paste(outdir,"tables","L_add.csv",sep="/"),header = T)
+
+#L_add %>%
+#  arrange(Donor,Recipient) %>%
+#  create_dt(caption="Ladd for each pairwise donor and recipient individual for each mutation type (deleterious, LoF).")
+
+```
+
+```{r}
+# A_add = Number of adaptive mutations unique to the donor genome (absent in recipient)
+
+A_add <- NULL
+a_add.full <- NULL
+for (pop1 in sampleSites$Pop)
+{
+ for (pop2 in sampleSites$Pop)
+ {
+   if (pop1 != pop2)
+   {
+     don.geno <- read.table(paste(outdir,"/upper10/geno/",pop1,".GT.FORMAT",sep=""), header = T)
+     inds1 <- colnames(don.geno)[-c(1,2)]
+     N1 <- ncol(don.geno)-2
+     L1 <- nrow(don.geno)
+       
+     rec.geno <- read.table(paste(outdir,"/upper10/geno/",pop2,".GT.FORMAT",sep=""), header = T)
+     inds2 <- colnames(rec.geno)[-c(1,2)]
+     N2 <- ncol(rec.geno)-2
+     L2 <- nrow(rec.geno)
+       
+     for (j in 1:N1)
+     {
+       gt.don <- don.geno[,c(1:2,(j+2))]
+       for (k in 1:N2)
+       {
+         gt.rec <- rec.geno[,c(1:2,(k+2))]
+         gt.don.rec <- inner_join(gt.don,gt.rec,by=c("CHROM","POS"))
+         
+         colnames(gt.don.rec)[3:4] <- c("Donor","Recipient")
+           
+         a_add <- gt.don.rec %>%
+           filter(Donor != "0|0") %>%
+           filter(Recipient == "0|0")
+         
+         a_add.full <- rbind(a_add.full,a_add)
+           
+         df <- data.frame(Donor=inds1[j],Recipient=inds2[k],DonPop=pop1,RecPop=pop2,A_add=dim(a_add)[1])
+         A_add <- rbind(A_add,df)
+         
+       }
+     }
+   }
+ }
+}
+
+#write.csv(A_add,paste(outdir,"tables","A_add.csv",sep="/"),quote=F,row.names=F)
+
+A_add <- read.csv(paste(outdir,"tables","A_add.csv",sep="/"),header = T)
+
+#A_add %>%
+#  arrange(Donor,Recipient) %>%
+#  create_dt(caption="Aadd for each pairwise donor and recipient individual.")
+```
+
+**Joint consideration of both load and adaptive mutations added by donor**
+
+```{r}
+#| label: fig-additionalLoad
+#| fig-cap: "Genetic Compatibility assessment based on novel mutations added by donor. Mean number of unique adaptive alleles (x-axis) vs (A) LoF and (B) damaging missense alleles (y-axis) added by KLDR genomes that are absent in S. catenatus genomes from other populations (Madd). (C-D) Similar analysis was performed using WLRD genomes as donors."
+#| fig-height: 15
+#| fig-width: 21
+
+
+pops <- c("BERG", "BPNP", "CCRO", "CEBO", "GRLL", "JENN", "KBPP", "KLDR", "MOSQ", "PRDF", "ROME", "SPVY", "SSSP", "WLRD")
+plot_list1 <- list()
+table_list1 <- list()
+table_list2 <- list()
+for (don in c("KLDR","WLRD"))
+{
+  for (mut in c("nonsense","deleterious"))
+  {
+    add_comb <- L_add %>%
+    filter(Mutation == mut) %>%
+    select(-Mutation) %>%
+    inner_join(A_add,by=c("Donor", "Recipient","DonPop","RecPop"))
+    
+    summary.add <- add_comb %>%
+    filter(DonPop == don) %>%
+    group_by(RecPop) %>%
+    summarise(meanL_add = mean(L_add), sdL_add = sd(L_add),
+              meanA_add = mean(A_add), sdA_add = sd(A_add)) %>%
+    as.data.frame() %>% mutate(DonPop=don) %>%
+    left_join(sampleSites, by = c("RecPop" = "Pop"))
+    
+    table_list1[[paste(don,mut,sep="_")]] <- summary.add
+    table_list2[[paste(don,mut,sep="_")]] <- add_comb
+    
+    
+    p <- summary.add %>%
+      ggplot(aes(x=meanA_add, y=meanL_add, fill=RecPop), color="black")+
+      geom_vline(xintercept = mean(summary.add$meanA_add),linetype=2)+
+      geom_hline(yintercept = mean(summary.add$meanL_add),linetype=2)+
+      geom_smooth(method=lm,aes(y=meanL_add,x=meanA_add), color="gray50", fill=adjustcolor("#69b3a2", alpha=0.1),se=T)+
+      geom_point(color="black", size=7,  shape=21)+
+      theme_classic(base_size = 22)+
+      scale_fill_manual(values = summary.add$LabelCol)+
+      geom_text_repel(label=summary.add$RecPop, max.overlaps = 14, box.padding = 0.5, size=5)+
+      theme(legend.title=element_blank(),
+          axis.text = element_text(size=15),
+          legend.position = "none")
+    
+    plot_list1[[paste(don,mut,sep="_")]] <- p
+  }
+}
+plot_list1[["KLDR_nonsense"]] <- plot_list1[["KLDR_nonsense"]] +
+  ggtitle(paste("(A) KLDR-LoF"))+
+  labs(x=expression(paste(M[add]," -Adaptive")),
+       y=expression(paste(M[add]," -LoF")))+
+      scale_x_continuous(limits=c(100,170),breaks = seq(100, 170, by=10))+
+      scale_y_continuous(limits=c(80,140),breaks = seq(80, 140, by=10))
+
+plot_list1[["KLDR_deleterious"]] <- plot_list1[["KLDR_deleterious"]] +
+  ggtitle(paste("(B) KLDR-Damaging Missense"))+
+  labs(x=expression(paste(M[add]," -Adaptive")),
+       y=expression(paste(M[add]," -Damaging Missense")))+
+      scale_x_continuous(limits=c(100,170),breaks = seq(100, 170, by=10))+
+      scale_y_continuous(limits=c(450,650),breaks = seq(450,650,by=20))
+
+plot_list1[["WLRD_nonsense"]] <- plot_list1[["WLRD_nonsense"]] +
+  ggtitle(paste("(C) WLRD-LoF"))+
+  labs(x=expression(paste(M[add]," -Adaptive")),
+       y=expression(paste(M[add]," -LoF")))+
+        scale_x_continuous(limits=c(100,170),breaks = seq(100, 170, by=10))+
+      scale_y_continuous(limits=c(80,140),breaks = seq(80, 140, by=10))
+
+plot_list1[["WLRD_deleterious"]] <- plot_list1[["WLRD_deleterious"]] +
+  ggtitle(paste("(D) WLRD-Damaging Missense"))+
+  labs(x=expression(paste(M[add]," -Adaptive")),
+       y=expression(paste(M[add]," -Damaging Missense")))+
+        scale_x_continuous(limits=c(100,170),breaks = seq(100, 170, by=10))+
+      scale_y_continuous(limits=c(450,650),breaks = seq(450,650,by=20))
+  
+Fig3 <- ggarrange(plotlist = plot_list1,ncol=2,nrow = 2)
+Fig3
+ggsave(paste(outdir,"figures","Figure3.pdf",sep="/"), Fig3, width = 18, height = 12)
+
+write_xlsx(table_list1,paste(outdir,"tables","mean_mutationsAdded.xlsx", sep="/"))
+```
+
+Regression analysis for genetic compatibility assessment based on novel mutations added by donor.
+
+```{r}
+r2.df <- NULL
+p.mutAdd <- list()
+for (don in c("KLDR","WLRD"))
+{
+  for (mut in c("nonsense","deleterious"))
+  {
+    df <- table_list1[[paste(don,mut,sep="_")]]
+    lm.df <- lm(formula = meanL_add ~ meanA_add, data = df)
+    summ.lm <- summary(lm.df)
+    
+    df2 <- data.frame(Donor=don,Mutation=mut,
+                      R2=summ.lm$adj.r.squared,pval=as.numeric(summ.lm$coefficients[,4][2]))
+    r2.df <- rbind(r2.df,df2)
+    
+    df2 <- table_list2[[paste(don,mut,sep="_")]] %>%
+      filter(DonPop == don)
+    
+    test.mutAdd <- pairwise.wilcox.test(df2$L_add, df2$RecPop,p.adjust.method = "fdr")
+
+    p.mutAdd[[paste(don,mut,sep="_")]] <- test.mutAdd$p.value %>%
+    as.data.frame() %>%
+    rownames_to_column(var=" ")
+    
+  }
+}
+
+r2.df %>%
+  arrange(Donor) %>%
+  kbl(caption = "Linear Regression of genetic compatibility") %>%
+  kable_classic(full_width = F, html_font = "Arial")
+
+write_xlsx(p.mutAdd,paste(outdir,"tables","pvalue_mutationsAdded.xlsx", sep="/"))
+
+```
+
+
+### mutations added vs total mutations present
+
+```{r}
+
+table_mutAdd_summary_ind <- list()
+table_mutAdd_summary_pop <- list()
+
+df.loadMuts <- NULL
+for (don in c("KLDR","WLRD"))
+{
+  for (mut in c("nonsense","deleterious"))
+  {
+    df <- table_list2[[paste(don,mut,sep="_")]] %>%
+      filter(DonPop == don) %>%
+      mutate(Mutation = mut) 
+    
+    df3 <- inner_join(df,df.muts,by=c("Recipient" ="SampleID","Mutation","RecPop" = "Pop"))
+    df.loadMuts <- rbind(df.loadMuts,df3)
+    
+    
+  }
+}
+
+df4 <- df.muts %>%
+  filter(Mutation=="adaptive") %>%
+  select(-Mutation)
+
+
+df.loadAdd.muts <- df.loadMuts %>%
+  inner_join(df4,by=c("Recipient"="SampleID","RecPop"="Pop"))
+
+colnames(df.loadAdd.muts)[8:9] <- c("L_muts","A_muts")
+    
+df.loadAdd.muts <- df.loadAdd.muts %>%
+      mutate(Prop_L_add=L_add/(L_add+L_muts),Prop_A_add=A_add/(A_add+A_muts))
+    
+for (don in c("KLDR","WLRD"))
+{
+  for (mut in c("nonsense","deleterious"))
+  {
+    df <- df.loadAdd.muts %>%
+      filter(DonPop == don) %>%
+      filter(Mutation == mut) 
+    
+    df.summary <- df %>%
+    group_by(Recipient) %>%
+    summarise(meanProp_L_add = mean(Prop_L_add), sdProp_L_add = sd(Prop_L_add),
+              meanProp_A_add = mean(Prop_A_add), sdProp_A_add = sd(Prop_A_add)) %>%
+    as.data.frame() %>% mutate(DonPop=don) %>%
+    left_join(sampleInfo, by = c("Recipient" = "SampleID"))
+    
+    table_mutAdd_summary_ind[[paste(don,mut,sep="_")]] <- df.summary
+    
+    df.summary.pop <-df.summary %>%
+       group_by(Pop) %>%
+    summarise(popmeanProp_L_add = mean(meanProp_L_add), popsdProp_L_add = sd(meanProp_L_add),
+              popmeanProp_A_add = mean(meanProp_A_add), popsdProp_A_add = sd(meanProp_A_add)) %>%
+    as.data.frame() %>% mutate(DonPop=don) %>%
+    left_join(sampleSites, by = c("Pop"))
+    
+    table_mutAdd_summary_pop[[paste(don,mut,sep="_")]] <- df.summary.pop
+    
+  }
+}
+
+
+write_xlsx(table_mutAdd_summary_ind,paste(outdir,"tables","addProportions_summary_ind.xlsx", sep="/"))
+write_xlsx(table_mutAdd_summary_pop,paste(outdir,"tables","addProportions_summary_pop.xlsx", sep="/"))
+
+```
+
+```
+
+
+
+#### Mutations masked ($M_{mask}$)
+
+Conceptually, $M_{mask}$ measures the number of loci where the recipient genome carries the deleterious allele in homozygous state (i.e., deleterious allele is exposed) but will be masked in heterozygote in the next generation when crossed with the donor genome. Thus, $M_{mask}$ quantifies the number of exposed loci in recipient genome that a donor genome can theoretically mask in the next generation when crossed with recipient genome.
+
+To measure $M_{mask}$, we first compared, at a given locus $l$, the genotype of both the donor ($g_l^{d}$) and the recipient genome ($g_l^{r}$). If the deleterious allele is exposed in the recipient genome in homozygous state, i.e., $g_l^{r} = 1|1$ but is absent in the donor genome, i.e., $g_l^{d} = 0|0$ then, we count that locus as a mutation masked ($m_m(d,r)$). However, if the donor genome is heterozygous of the deleterious allele  $g_n^{d} = 0|1$ then under the assumption of Mendelian inheritance (i.e. independent assortment of alleles in gametes), the probability of masking of that given locus is only 0.5. \
+Hence we can divide the $M_{mask}$ into two subcategories $m_{m}^{P = 1}$ and $m_{m}^{P = 0.5}$ depending on the donor genotype.
+
+
+$\textbf{M}_{mask}^{P = 1} = \sum^{L_{a}}_{l=1} m_m^{P=1}(d,r)$
+
+$\textbf{M}_{mask}^{P = 0.5} = \sum^{L_{b}}_{l=1} m_m^{P=0.5}(d,r)$
+
+where $L_a$ are the total number of deleterious loci where $g_l^{𝑑}=0|0 \text{ & } g_l^{r}= 1|1$ and $L_b$ are the total number of deleterious loci where $g_l^{𝑑}=0|1 \text{ & } g_l^{r}= 1|1$
+
+
+```{r}
+
+# L_mask <- NULL
+# for (pop1 in sampleSites$Pop)
+# {
+# for (pop2 in sampleSites$Pop)
+#  {
+#  for (mut in c("deleterious","nonsense"))
+#  {
+#    if (pop1 != pop2)
+#    {
+#        don.geno <- read.table(paste(genoDir,"/",pop1,".",mut,".GT.FORMAT",sep=""), header = T)
+#        inds1 <- colnames(don.geno)[-c(1,2)]
+#        N1 <- ncol(don.geno)-2
+#        L1 <- nrow(don.geno)
+       
+#        rec.geno <- read.table(paste(genoDir,"/",pop2,".",mut,".GT.FORMAT",sep=""), header = T)
+#        inds2 <- colnames(rec.geno)[-c(1,2)]
+#        N2 <- ncol(rec.geno)-2
+#        L2 <- nrow(rec.geno)
+       
+#        for (j in 1:N1)
+#        {
+#          gt.don <- don.geno[,c(1:2,(j+2))]
+         
+#          for (k in 1:N2)
+#          {
+#            gt.rec <- rec.geno[,c(1:2,(k+2))]
+#            gt.don.rec <- inner_join(gt.don,gt.rec,by=c("CHROM","POS"))
+           
+#            colnames(gt.don.rec)[3:4] <- c("Donor","Recipient")
+           
+#            case1 <- gt.don.rec %>%
+#              filter(Recipient == "1|1") %>%
+#              filter(Donor == "0|0")
+           
+#            case2 <- gt.don.rec %>%
+#              filter(Recipient == "1|1") %>%
+#              filter(Donor == "0|1" | Donor == "1|0")
+           
+#            df <- data.frame(Donor=inds1[j],Recipient=inds2[k],DonPop=pop1,RecPop=pop2,
+#                             Mutation=mut, Mmask_p1 = dim(case1)[1], Mmask_p0.5 = dim(case2)[1])
+#            L_mask <- rbind(L_mask,df)
+#          }
+#        }
+#    }
+#    }
+#  }
+# }
+
+# write.csv(L_mask,paste(outdir,"tables","L_mask.csv", sep="/"),quote=F,row.names=F)
+
+L_mask <- read.csv(paste(outdir,"tables","L_mask.csv",sep="/"),header = T)
+
+#L_mask %>%
+#  arrange(Donor,Recipient) %>%
+#  create_dt(caption="P_mask for each pairwise donor and recipient individual for each mutation type (deleterious, LoF).")
+
+```
+
+
+
+#### Mutations unmasked ($M_{unmask}$)
+
+Conceptually, $M_{unmask}$ measures the number of loci where the deleterious allele is in heterozygous state (i.e., deleterious allele is masked) in the recipient genome  but will be unmasked or exposed in homozygous state in the next generation when crossed with the donor genome. Thus, $M_{unmask}$ quantifies the number of masked loci in the recipient genome that a donor genome can theoretically unmask in the next generation when crossed with recipient genome.
+
+To measure $M_{unmask}$, we first compared, at a given locus $l$, the genotype of both the donor ($g_l^{d}$) and the recipient genome ($g_l^{r}$). If the deleterious allele is masked in the recipient genome in heterozygous state, i.e., $g_l^{r} = 0|1$ but is exposed in the donor genome, i.e., $g_l^{d} = 1|1$ then under the assumption of Mendelian inheritance (i.e. independent assortment of alleles in gametes), the probability of unmasking of that given locus is 0.5, whereas, if $g_l^{d} = 0|1$, then the probability of unmasking of that given locus is only 0.25. \
+Hence we can divide the $m_{u}$ into two subcategories $m_{u}^{P = 0.5}$ and $m_{u}^{P = 0.25}$ depending on the donor genotype.
+
+
+$\textbf{M}_{unmask}^{P = 0.5} = \sum^{L_{a}}_{l=1} m_u^{P=0.5}(d,r)$
+
+$\textbf{M}_{unmask}^{P = 0.25} = \sum^{L_{b}}_{l=1} m_u^{P=0.25}(d,r)$
+
+where $L_a$ are the total number of deleterious loci where $g_l^{𝑑}=1|1 \text{ & } g_l^{r}= 0|1$ and $L_b$ are the total number of deleterious loci where $g_l^{𝑑}=0|1 \text{ & } g_l^{r}= 0|1$
+
+```{r}
+
+# L_unmask <- NULL
+# for (pop1 in sampleSites$Pop)
+# {
+# for (pop2 in sampleSites$Pop)
+#  {
+#  for (mut in c("deleterious","nonsense"))
+#  {
+#    if (pop1 != pop2)
+#    {
+#        don.geno <- read.table(paste(genoDir,"/",pop1,".",mut,".GT.FORMAT",sep=""), header = T)
+#        inds1 <- colnames(don.geno)[-c(1,2)]
+#        N1 <- ncol(don.geno)-2
+#        L1 <- nrow(don.geno)
+       
+#        rec.geno <- read.table(paste(genoDir,"/",pop2,".",mut,".GT.FORMAT",sep=""), header = T)
+#        inds2 <- colnames(rec.geno)[-c(1,2)]
+#        N2 <- ncol(rec.geno)-2
+#        L2 <- nrow(rec.geno)
+       
+#        for (j in 1:N1)
+#        {
+#          gt.don <- don.geno[,c(1:2,(j+2))]
+         
+#          for (k in 1:N2)
+#          {
+#            gt.rec <- rec.geno[,c(1:2,(k+2))]
+#            gt.don.rec <- inner_join(gt.don,gt.rec,by=c("CHROM","POS"))
+           
+#            colnames(gt.don.rec)[3:4] <- c("Donor","Recipient")
+           
+#            case1 <- gt.don.rec %>%
+#              filter(Recipient == "0|1" | Recipient == "1|0") %>%
+#              filter(Donor == "1|1")
+           
+#            case2 <- gt.don.rec %>%
+#             filter(Recipient == "0|1" | Recipient == "1|0") %>%
+#             filter(Donor == "0|1" | Donor == "1|0")
+           
+           
+           
+#            df <- data.frame(Donor=inds1[j],Recipient=inds2[k],DonPop=pop1,RecPop=pop2,
+#                             Mutation=mut, Munmask_p0.5 = dim(case1)[1], Munmask_p0.25 = dim(case2)[1])
+#            L_unmask <- rbind(L_unmask,df)
+#          }
+#        }
+#    }
+#    }
+#  }
+# }
+
+# write.csv(L_unmask,paste(outdir,"tables","L_unmask.csv", sep="/"),quote=F,row.names=F)
+
+L_unmask <- read.csv(paste(outdir,"tables","L_unmask.csv",sep="/"),header = T)
+
+
+```
+
+```{r, results='hide'}
+#| label: fig-maskPotential
+#| fig-cap: "Masking and unmasking potential of (A-B) KLDR and (C-D) WLRD donor populations. Number of exposed (A) LoF or (B) deleterious mutations in different recipient populations that can be masked by KLDR population at probability of 1 (darkgreen) and 0.5 (lightgreen) in the next generation, and the number of masked LoF or deleterious mutations in different recipient populations that can be exposed by KLDR population at probability of 0.5 (darkred) and 0.25 (lightred) in the next generation. (C-D) Similar analysis was performed with WLRD donor population. Barplots indicate the mean number of mutations per donor-recipient genome pair and error bars represent 1SD. Higher number of mutations masked and lower number of mutations unmasked in the next generation makes the donor population more genetically compatible."
+#| fig-height: 15
+#| fig-width: 21
+
+pops <- c("BERG", "BPNP", "CCRO", "CEBO", "GRLL", "JENN", "KBPP", "KLDR", "MOSQ", "PRDF", "ROME", "SPVY", "SSSP", "WLRD")
+plot_list2 <- list()
+table_list3 <- list()
+table_list4 <- list()
+for (don in c("KLDR","WLRD"))
+{
+  for (mut in c("nonsense","deleterious"))
+  {
+    mask_comb <- L_mask %>%
+    filter(Mutation == mut) %>%
+    inner_join(L_unmask,by=c("Donor", "Recipient","Mutation","DonPop","RecPop"))
+    
+    summary.mask <- mask_comb %>%
+    filter(DonPop == don) %>%
+    group_by(RecPop) %>%
+    summarise(meanMmask_p1 = mean(Mmask_p1), sdMmask_p1 = sd(Mmask_p1),
+              meanMmask_p0.5 = mean(Mmask_p0.5), sdMmask_p0.5 = sd(Mmask_p0.5),
+              meanMunmask_p0.5 = mean(Munmask_p0.5), sdMunmask_p0.5 = sd(Munmask_p0.5),
+              meanMunmask_p0.25 = mean(Munmask_p0.25), sdMunmask_p0.25 = sd(Munmask_p0.25)) %>%
+    as.data.frame() %>% mutate(DonPop=don)
+    
+    table_list3[[paste(don,mut,sep="_")]] <- summary.mask
+    table_list4[[paste(don,mut,sep="_")]] <- mask_comb
+    
+    df_long <- summary.mask %>%
+      pivot_longer(cols = starts_with("mean"), names_to = "variable", values_to = "value")
+    
+    sd_values <- summary.mask %>%
+      pivot_longer(cols = starts_with("sd"), names_to = "variable_sd", values_to = "sd") %>%
+      mutate(variable = gsub("sd", "mean", variable_sd)) %>%
+      select(-variable_sd)
+    
+    merged_df <- left_join(df_long, sd_values, by = c("RecPop", "variable"))
+    
+    merged_df <- merged_df %>%
+      mutate(value = ifelse(grepl("Munmask", variable), -value, value))
+    
+    merged_df$variable <- factor(merged_df$variable, levels = c("meanMmask_p1", "meanMmask_p0.5", "meanMunmask_p0.5", "meanMunmask_p0.25"))
+    levels(merged_df$variable) <- c("Masked (p=1)", "Masked (p=0.5)", "Unmasked (p=0.5)", "Unmasked (p=0.25)")
+    
+    if (don == "KLDR")
+    {
+      pop_order <- c("CEBO","PRDF","SPVY","WLRD","BERG","BPNP","CCRO","GRLL","JENN","KBPP","MOSQ","ROME","SSSP")
+      merged_df$RecPop <- factor(merged_df$RecPop, levels=rep(pop_order))
+    }
+    if (don == "WLRD")
+    {
+      pop_order <- c("CEBO","PRDF","SPVY","KLDR","BERG","BPNP","CCRO","GRLL","JENN","KBPP","MOSQ","ROME","SSSP")
+      merged_df$RecPop <- factor(merged_df$RecPop, levels=rep(pop_order))
+    }
+    
+    
+    p <- ggplot(merged_df, aes(x = RecPop, y = value, fill = variable)) +
+      geom_rect(aes(xmin = 0.5, xmax = 3.5, ymin = -Inf, ymax = Inf), fill = "#EA6964", alpha = 0.008) +
+      geom_rect(aes(xmin = 3.5, xmax = 4.5, ymin = -Inf, ymax = Inf), fill = "#4AB62C", alpha = 0.008) +
+      geom_rect(aes(xmin = 4.5, xmax = 13.5, ymin = -Inf, ymax = Inf), fill = "#33ACE3", alpha = 0.008)+
+      geom_bar(stat = "identity", position = position_dodge(width = 0.9), color="black",
+               data = subset(merged_df, variable %in% c("Masked (p=1)", "Masked (p=0.5)"))) +
+      geom_bar(stat = "identity", position = position_dodge(width = 0.9), color="black",
+               data = subset(merged_df, variable %in% c("Unmasked (p=0.5)", "Unmasked (p=0.25)"))) +
+      geom_errorbar(aes(ymin = value - sd, ymax = value + sd), size=0.9, width = 0.2, position = position_dodge(width = 0.9), 
+                    data = subset(merged_df, variable %in% c("Masked (p=1)", "Masked (p=0.5)")))+
+      geom_errorbar(aes(ymin = value + sd, ymax = value - sd), size= 0.9, width = 0.2, position = position_dodge(width = 0.9), 
+                    data = subset(merged_df, variable %in% c("Unmasked (p=0.5)","Unmasked (p=0.25)"))) +
+      scale_fill_manual(values = c("Masked (p=1)" = "darkgreen", "Masked (p=0.5)" = "lightgreen", "Unmasked (p=0.5)" = "tomato4", "Unmasked (p=0.25)" = "tomato")) +
+      labs(x = "", y = "No.of mutations", fill = "Type") +
+      theme_classic(base_size = 22)+
+      theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+      geom_hline(yintercept = 0, size = 1.5)
+    
+    plot_list2[[paste(don,mut,sep="_")]] <- p
+  }
+}
+
+plot_list2[["KLDR_nonsense"]] <- plot_list2[["KLDR_nonsense"]] +
+  ggtitle(paste("(A) KLDR-LoF"))+
+      scale_y_continuous(limits=c(-100,50),breaks = c(seq(-100, 50, by=25)),labels = abs)
+
+plot_list2[["KLDR_deleterious"]] <- plot_list2[["KLDR_deleterious"]] +
+  ggtitle(paste("(B) KLDR-Damaging Missense"))+
+  scale_y_continuous(limits=c(-400,200),breaks = seq(-400, 200, by=50),labels = abs)
+
+plot_list2[["WLRD_nonsense"]] <- plot_list2[["WLRD_nonsense"]] +
+  ggtitle(paste("(C) WLRD-LoF"))+
+  scale_y_continuous(limits=c(-100,50),breaks = c(seq(-350, 50, by=25)),labels = abs)
+
+plot_list2[["WLRD_deleterious"]] <- plot_list2[["WLRD_deleterious"]] +
+  ggtitle(paste("(D) WLRD-Damaging Missense"))+
+  scale_y_continuous(limits=c(-400,200),breaks = seq(-400, 200, by=50),labels = abs)
+  
+Fig4 <- ggarrange(plotlist = plot_list2,ncol=2,nrow = 2, common.legend = T,align = "hv")
+Fig4
+ggsave(paste(outdir,"figures","Figure4.pdf",sep="/"), Fig4, width = 25, height = 15)
+
+
+write_xlsx(table_list3,paste(outdir,"tables","mean_mutationsMasked.xlsx", sep="/"))
+
+```
+
+#### statistical inferences
+
+```{r}
+
+p.mutMask <- list()
+for (don in c("KLDR","WLRD"))
+{
+  for (mut in c("nonsense","deleterious"))
+  {
+    df2 <- table_list4[[paste(don,mut,sep="_")]] %>%
+      filter(DonPop == don)
+    
+    test1 <- pairwise.wilcox.test(df2$Mmask_p1, df2$RecPop,p.adjust.method = "fdr")
+    test2 <- pairwise.wilcox.test(df2$Mmask_p0.5, df2$RecPop,p.adjust.method = "fdr")
+    test3 <- pairwise.wilcox.test(df2$Munmask_p0.5, df2$RecPop,p.adjust.method = "fdr")
+    test4 <- pairwise.wilcox.test(df2$Munmask_p0.25, df2$RecPop,p.adjust.method = "fdr")
+
+    for (t in c(1:4))
+    {
+      test <- get(paste("test",t,sep=""))
+      p.mutMask[[paste(don,mut,colnames(df2)[t+5],sep="_")]] <- test$p.value %>%
+          as.data.frame() %>%
+          rownames_to_column(var=" ")
+    }
+    
+    
+    
+  }
+}
+
+write_xlsx(p.mutMask,paste(outdir,"tables","pvalue_mutationsMasked.xlsx", sep="/"))
+
+```
+
+### Mutation load and mutations masked
+
+```{r}
+table_mutMask_Load_summary_ind <- list()
+table_mutMask_Load_summary_pop <- list()
+table_mutMask_Load_full <- list()
+
+for (don in c("KLDR","WLRD"))
+{
+  for (mut in c("nonsense","deleterious"))
+  {
+    df <- table_list4[[paste(don,mut,sep="_")]] %>%
+      filter(DonPop == don)
+    
+    df <- inner_join(df,df.Load,by=c("Recipient" ="SampleID","Mutation"))
+    df <- df %>%
+      mutate(Prop_Mmask_p1=Mmask_p1/loadR,Prop_Mmask_p0.5=Mmask_p0.5/loadR,
+             Prop_Munmask_p0.5=Munmask_p0.5/loadM,Prop_Munmask_p0.25=Munmask_p0.25/loadM)
+    
+    table_mutMask_Load_full[[paste(don,mut,sep="_")]] <- df
+    
+    df.summary <- df %>%
+    filter(DonPop == don,
+           Mutation == mut) %>%
+    group_by(Recipient) %>%
+    summarise(meanProp_Mmask_p1 = mean(Prop_Mmask_p1), sdProp_Mmask_p1 = sd(Prop_Mmask_p1),
+              meanProp_Mmask_p0.5 = mean(Prop_Mmask_p0.5), sdProp_Mmask_p0.5 = sd(Prop_Mmask_p0.5),
+              meanProp_Munmask_p0.5 = mean(Prop_Munmask_p0.5), sdProp_Munmask_p0.5 = sd(Prop_Munmask_p0.5),
+              meanProp_Munmask_p0.25 = mean(Prop_Munmask_p0.25), sdProp_Munmask_p0.25 = sd(Prop_Munmask_p0.25)) %>%
+    as.data.frame() %>% mutate(DonPop=don) %>%
+    left_join(sampleInfo, by = c("Recipient" = "SampleID"))
+    
+    table_mutMask_Load_summary_ind[[paste(don,mut,sep="_")]] <- df.summary
+    
+    df.summary.pop <-df.summary %>%
+       group_by(Pop) %>%
+    summarise(popmeanProp_Mmask_p1 = mean(meanProp_Mmask_p1), popsdProp_Mmask_p1 = sd(meanProp_Mmask_p1),
+              popmeanProp_Mmask_p0.5 = mean(meanProp_Mmask_p0.5), popsdProp_Mmask_p0.5 = sd(meanProp_Mmask_p0.5),
+              popmeanProp_Munmask_p0.5 = mean(meanProp_Munmask_p0.5), popsdProp_Munmask_p0.5 = sd(meanProp_Munmask_p0.5),
+              popmeanProp_Munmask_p0.25 = mean(meanProp_Munmask_p0.25), popsdProp_Munmask_p0.25 = sd(meanProp_Munmask_p0.25)) %>%
+    as.data.frame() %>% mutate(DonPop=don) %>%
+    left_join(sampleSites, by = c("Pop"))
+    
+    table_mutMask_Load_summary_pop[[paste(don,mut,sep="_")]] <- df.summary.pop
+  }
+}
+
+write_xlsx(table_mutMask_Load_summary_ind,paste(outdir,"tables","maskProportions_summary_ind.xlsx", sep="/"))
+write_xlsx(table_mutMask_Load_summary_pop,paste(outdir,"tables","maskProportions_summary_pop.xlsx", sep="/"))
+write_xlsx(table_mutMask_Load_full,paste(outdir,"tables","maskProportions_full.xlsx", sep="/"))
+```
+
+### Masking potential 
+
+```{r}
+
+df.Pmask <- list()
+donors <- c("KLDR","WLRD")
+plot_Pmask <- list()
+
+for (don in donors)
+{
+  for (mut in c("nonsense","deleterious"))
+  {
+    df2 <- table_list4[[paste(don,mut,sep="_")]] %>%
+      filter(DonPop == don) %>%
+      mutate(Pmask = Mmask_p1+0.5*Mmask_p0.5-0.5*Munmask_p0.5-0.25*Munmask_p0.25)
+    
+    summary.pmask <- df2 %>%
+      group_by(RecPop) %>%
+      summarise(meanP_mask = mean(Pmask), sdP_mask = sd(Pmask)) %>%
+      as.data.frame() %>% mutate(DonPop=don) %>%
+      left_join(sampleSites, by = c("RecPop" = "Pop")) %>%
+      arrange(factor(RecPop, levels=c("CEBO","PRDF","SPVY",
+                                                 setdiff(donors,don),
+                                                 "BERG","BPNP","CCRO","GRLL","JENN","KBPP","MOSQ","ROME","SSSP")))
+    
+    summary.pmask$RecPop <- factor(summary.pmask$RecPop, levels=c("CEBO","PRDF","SPVY",
+                                                 setdiff(donors,don),
+                                                 "BERG","BPNP","CCRO","GRLL","JENN","KBPP","MOSQ","ROME","SSSP"))
+    
+    
+    df.Pmask[[paste(don,mut,sep="_")]] <- summary.pmask
+    summary.pmask$Label <- c(rep("Recipient",3),rep("Donor",1),rep("Other",9))
+    
+    if (mut == "nonsense")
+      {
+      p <- ggplot(summary.pmask, aes(x=RecPop, y=meanP_mask, fill=RecPop)) + 
+    geom_bar(stat="identity", color="black", position=position_dodge()) +
+  geom_errorbar(aes(ymin=meanP_mask-sdP_mask, ymax=meanP_mask+sdP_mask), width=0.3,size=0.5,
+                position=position_dodge(0.9))+
+  theme_classic(base_size = 22)+
+  scale_fill_manual(values = alpha(summary.pmask$LabelCol,alpha=0.7))+
+  scale_y_continuous(limits=c(-30,70),breaks = seq(-30, 70, by=20))+
+  labs(y=expression(paste(P[mask])))+ 
+  theme(axis.title.x=element_blank(),
+        title=element_text(size=22),
+        legend.title=element_blank(),
+        axis.text.x = element_text(size = 15),
+        legend.position = "none")+
+  ggtitle(paste(don,"-", mut))
+
+  plot_Pmask[[paste(don,"_",mut)]] <- p
+    }
+    
+    if (mut == "deleterious")
+      {
+      p <- ggplot(summary.pmask, aes(x=RecPop, y=meanP_mask, fill=RecPop)) + 
+    geom_bar(stat="identity", color="black", position=position_dodge()) +
+  geom_errorbar(aes(ymin=meanP_mask-sdP_mask, ymax=meanP_mask+sdP_mask), width=0.3,size=0.5,
+                position=position_dodge(0.9))+
+  theme_classic(base_size = 22)+
+  scale_fill_manual(values = alpha(summary.pmask$LabelCol,alpha=0.7))+
+  scale_y_continuous(limits=c(-100,200),breaks = seq(-100, 200, by=50))+
+  labs(y=expression(paste(P[mask])))+ 
+  theme(axis.title.x=element_blank(),
+        title=element_text(size=22),
+        legend.title=element_blank(),
+        axis.text.x = element_text(size = 15),
+        legend.position = "none")+
+  ggtitle(paste(don,"-", mut))
+
+  plot_Pmask[[paste(don,"_",mut)]] <- p
+      }
+    
+      
+  }
+
+}
+
+fig4 <- ggarrange(plotlist = plot_Pmask,ncol=2,nrow = 2,align = "hv")
+#fig4
+ggsave(paste(outdir,"figures","maskingPotential.pdf",sep="/"), fig4, width = 25, height = 15)
+
+write_xlsx(df.Pmask,paste(outdir,"tables","mean_maskingPotential.xlsx", sep="/"))
+
+### statistical inference
+
+p.Pmask <- list()
+for (don in c("KLDR","WLRD"))
+{
+  for (mut in c("nonsense","deleterious"))
+  {
+    df <- table_list4[[paste(don,mut,sep="_")]] %>%
+      filter(DonPop == don) %>%
+      mutate(Pmask = Mmask_p1+0.5*Mmask_p0.5-0.5*Munmask_p0.5-0.25*Munmask_p0.25)
+    
+    test1 <- pairwise.wilcox.test(df$Pmask, df$RecPop,p.adjust.method = "fdr")
+      p.Pmask[[paste(don,mut,sep="_")]] <- test1$p.value %>%
+          as.data.frame() %>%
+          rownames_to_column(var=" ")
+  }
+}
+
+write_xlsx(p.Pmask,paste(outdir,"tables","pvalue_maskingPotential.xlsx", sep="/"))
+
+```
+
+
+
+
+### Local adaptation
+
+```{r snpAnnotate}
+genesAnno <- read.csv(paste(resources,"Scate_HiC.genes.csv",sep="/"), header = T) %>%
+  select(!X)
+
+nonSyn.snps <- read.table(paste(resources,"final172.nonSyn.annotate.txt",sep="/"), na.strings = NA, header = T, sep="\t") %>%
+  select(Chrom,Pos,Impact,GeneID,ProtChange) %>%
+  left_join(genesAnno, by="GeneID") %>%
+  rename("Chrom" = "Chrom.x") %>%
+  mutate(snpID=paste(Chrom,Pos,sep="_")) %>%
+  mutate(snpID = str_replace_all(snpID, "\\-", "."))
+```
+
+```{r}
+#| label: fig-localAdapt2
+#| fig-cap: "FST frequency histograms of different functional and neutral sites in S. catenatus populations. Light grey bars represent FST distribution of SNPs in gene-desert regions of the genome; red dashed lines indicate the 95th percentile FST value in gene-desert regions. Black vertical lines at the bottom of each plot denote FST estimates at each non-synonymous SNP in the upper10% genes. Upper10% genes that contain SNPs with FST > 95th %ile of gene-desert SNPs are labelled in blue.   The per-SNP FST for each SNP was calculated for (A) only using OH samples (NgeneDesert = 123,754; Nup10 = 1,053; Nup10 in top 5% = 78)  "
+#| fig-height: 9
+#| fig-width: 18
+
+
+# Only OH
+
+#onlyOH.up10.vcf <- read.vcfR(paste(outdir,"upper10","onlyOH.upper10.nonSyn.phasedSNPs.recode.vcf",sep="/"))
+
+#sampleIds <- data.frame(SampleID=colnames(onlyOH.up10.vcf@gt)[-1]) %>%
+#  inner_join(sampleInfo)
+
+#up10.genind <- vcfR2genind(onlyOH.up10.vcf)
+#pop(up10.genind) <- sampleIds$Pop
+
+#onlyOH.up10.bstat<-basic.stats(up10.genind, diploid=TRUE, digits=3)
+
+#onlyOH.up10.fst <- onlyOH.up10.bstat$perloc %>%
+#  as.data.frame() %>%
+#  filter(!is.na(Fst)) %>%
+#  rownames_to_column(var = "snpID") %>%
+#  left_join(nonSyn.snps, by="snpID")%>%
+#  group_by(GeneID) %>%
+#  mutate(meanFst = mean(Fst)) %>%
+#  as.data.frame()
+
+#write.csv(onlyOH.up10.fst,paste(outdir,"tables","onlyOH.up10.fst.csv",sep="/"),quote=F,row.names=F)
+
+onlyOH.up10.fst <- read.csv(paste(outdir,"tables","onlyOH.up10.fst.csv",sep="/"),header = T)
+
+#onlyOH.genDes.vcf <- read.vcfR(paste(outdir,"geneDesert","onlyScat.onlyOH.phasedSNPs.geneDes.recode.vcf",sep="/"))
+#sampleIds <- data.frame(SampleID=colnames(onlyOH.genDes.vcf@gt)[-1]) %>%
+#  inner_join(sampleInfo)
+
+#genDes.genind <- vcfR2genind(onlyOH.genDes.vcf)
+#pop(genDes.genind) <- sampleIds$Pop
+
+#onlyOH.genDes.bstat<-basic.stats(genDes.genind, diploid=TRUE, digits=3)
+
+#onlyOH.genDes.fst <- onlyOH.genDes.bstat$perloc %>%
+#  as.data.frame() %>%
+#  filter(!is.na(Fst))%>%
+#  rownames_to_column(var = "snpID")
+
+#write.csv(onlyOH.genDes.fst,paste(outdir,"tables","onlyOH.genDes.fst.csv",sep="/"),quote=F,row.names=F)
+
+onlyOH.genDes.fst <- read.csv(paste(outdir,"tables","onlyOH.genDes.fst.csv",sep="/"),header = T)
+
+# Plot (A) all 152 and (B) only OH
+
+#df2_labels <- up10.fst[up10.fst$Fst > quantile(genDes.fst$Fst,0.95), ] %>%
+#  filter(!is.na(GeneName)) %>%
+#  select(GeneName,meanFst, Fst) %>%
+#  group_by(GeneName) %>%
+#  summarise(maxFst=max(Fst)) %>%
+#  as.data.frame()
+
+#write.csv(df2_labels,paste(outdir,"tables","up10.geneLabels.csv",sep="/"),quote=F,row.names=F)
+
+
+
+#onlyOH
+
+#df2_labels <- onlyOH.up10.fst[onlyOH.up10.fst$Fst > quantile(onlyOH.genDes.fst$Fst,0.95), ] %>%
+#  filter(!is.na(GeneName)) %>%
+#  select(GeneName,meanFst, Fst) %>%
+#  group_by(GeneName) %>%
+#  summarise(maxFst=max(Fst)) %>%
+#  as.data.frame()
+
+# write.csv(df2_labels,paste(outdir,"tables","onlyOH.up10.geneLabels.csv",sep="/"),quote=F,row.names=F)
+
+onlyOH.u10.labels <- read.csv(paste(outdir,"tables","onlyOH.up10.geneLabels.csv",sep="/"),header = T,na.strings = NA)
+onlyOH.u10.labels <- onlyOH.u10.labels %>%
+  filter(GeneID != "")
+
+randNum2 <- runif(nrow(onlyOH.u10.labels), min = 500, max = 2000 / onlyOH.u10.labels$maxFst)
+
+p <- ggplot(onlyOH.genDes.fst, aes(x=Fst)) + 
+ geom_histogram(colour="gray", fill="gray", binwidth=0.005)+
+  geom_vline(xintercept=quantile(onlyOH.genDes.fst$Fst,0.95), linetype=2, color="salmon", lwd=1)+
+  geom_rug(data=onlyOH.up10.fst, aes(x = Fst), inherit.aes = F)+
+  geom_segment(data = onlyOH.u10.labels, aes(x = maxFst, xend = maxFst, y = 0, yend = randNum2, size=0.5),
+                      color = alpha("gray10",alpha = 0.5), size = 0.2, linetype=88)+
+  geom_text_repel(data = onlyOH.u10.labels, aes(x = maxFst, y = randNum2, label = GeneID),
+                   hjust = -0.1, vjust = 0.5, color = "royalblue4", max.overlaps = 32) +
+  theme_classic(base_size = 22)+
+  scale_x_continuous(labels =comma, breaks=(seq(0,1,0.1)))+
+  scale_y_continuous(labels =comma, breaks=(seq(0,8000,1000)))+
+  labs(y=expression(paste("#",SNPs[geneDesert])),
+       x=expression(paste(F[ST])))+ 
+  theme(legend.title=element_blank(),
+        title=element_text(size=15),
+        axis.text.x = element_text(size = 12),
+        legend.position = "none")+
+  ggtitle("Only OH populations")
+
+ggsave(paste(outdir,"figures","localAdapt_onlyOH.pdf",sep="/"), p, width = 12, height = 8)
+print(p)
+```
+
+```{r, include=FALSE}
+#| label: fig-localAdapt1
+#| fig-cap: "FST frequency histograms of different functional and neutral sites in S. catenatus populations. Light grey bars represent FST distribution of SNPs in gene-desert regions of the genome; red dashed lines indicate the 95th percentile FST value in gene-desert regions. Black vertical lines at the bottom of each plot denote FST estimates at each non-synonymous SNP in the upper10% genes. Upper10% genes that contain SNPs with FST > 95th %ile of gene-desert SNPs are labelled in blue.   The per-SNP FST for each SNP was calculated for (A) samples from all populations (NgeneDesert = 133,322; Nup10 = 1,160; Nup10 in top 5% = 80)"
+#| fig-height: 9
+#| fig-width: 18
+
+# all152
+#up10.vcf <- read.vcfR(paste(outdir,"upper10","final152.upper10.nonSyn.phasedSNPs.recode.vcf",sep="/"))
+
+#> dim(up10.vcf)
+#variants fix_cols  gt_cols 
+#    1719        8      153 
+
+#sampleIds <- data.frame(SampleID=colnames(up10.vcf@gt)[-1]) %>%
+#  inner_join(sampleInfo)
+
+#up10.genind <- vcfR2genind(up10.vcf)
+#pop(up10.genind) <- sampleIds$Pop
+
+#up10.bstat<-basic.stats(up10.genind, diploid=TRUE, digits=3)
+
+#up10.fst <- up10.bstat$perloc %>%
+#  as.data.frame() %>%
+#  filter(!is.na(Fst)) %>%
+#  rownames_to_column(var = "snpID") %>%
+#  left_join(nonSyn.snps, by="snpID") %>%
+#  group_by(GeneID) %>%
+#  mutate(meanFst = mean(Fst)) %>%
+#  as.data.frame()
+
+#write.csv(up10.fst,paste(outdir,"tables","up10.fst.csv",sep="/"),quote=F,row.names=F)
+up10.fst <- read.csv(paste(outdir,"tables","up10.fst.csv",sep="/"),header = T)
+
+
+#genDes.vcf <- read.vcfR(paste(outdir,"geneDesert","onlyScat.final152.phasedSNPs.geneDes.recode.vcf",sep="/"))
+
+#> dim(genDes.vcf)
+#variants fix_cols  gt_cols 
+#    175544        8      153 
+
+#sampleIds <- data.frame(SampleID=colnames(genDes.vcf@gt)[-1]) %>%
+#  inner_join(sampleInfo)
+
+#genDes.genind <- vcfR2genind(genDes.vcf)
+#pop(genDes.genind) <- sampleIds$Pop
+
+#genDes.bstat<-basic.stats(genDes.genind, diploid=TRUE, digits=3)
+
+#genDes.fst <- genDes.bstat$perloc %>%
+#  as.data.frame() %>%
+#  filter(!is.na(Fst)) %>%
+#  rownames_to_column(var = "snpID")
+
+#write.csv(genDes.fst,paste(outdir,"tables","genDes.fst.csv",sep="/"),quote=F,row.names=F)
+genDes.fst <- read.csv(paste(outdir,"tables","genDes.fst.csv",sep="/"),header = T)
+u10.labels <- read.csv(paste(outdir,"tables","up10.geneLabels.csv",sep="/"),header = T,na.strings = NA)
+u10.labels <- u10.labels %>%
+  filter(GeneID != "")
+randNum1 <- runif(nrow(u10.labels), min = 500, max = 2000 / u10.labels$maxFst)
+
+p14 <- ggplot(genDes.fst, aes(x=Fst)) + 
+ geom_histogram(colour="gray", fill="gray", binwidth=0.005)+
+  geom_vline(xintercept=quantile(genDes.fst$Fst,0.95), linetype=2, color="salmon", lwd=1)+
+  geom_rug(data=up10.fst, aes(x = Fst), inherit.aes = F)+
+  geom_segment(data = u10.labels, aes(x = maxFst, xend = maxFst, y = 0, yend = randNum1, size=0.5),
+                      color = alpha("gray10",alpha = 0.5), size = 0.4, linetype=88)+
+  geom_text_repel(data = u10.labels, aes(x = maxFst, y = randNum1, label = GeneID),
+                   hjust = -0.1, vjust = 0.5, color = "royalblue4", max.overlaps = 15, box.padding = 0.5) +
+  theme_classic(base_size = 22)+
+  scale_x_continuous(labels =comma, breaks=(seq(0,1,0.1)))+
+  scale_y_continuous(labels =comma, breaks=(seq(0,8000,1000)))+
+  labs(y=expression(paste("#",SNPs[geneDesert])),
+       x=expression(paste(F[ST])))+ 
+  theme(legend.title=element_blank(),
+        title=element_text(size=15),
+        axis.text.x = element_text(size = 12),
+        legend.position = "none")+
+  ggtitle("(B) All populations")
+
+
+
+ggsave(paste(outdir,"figures","localAdapt_all152.pdf",sep="/"), p14, width = 12, height = 8)
+print(p14)
+```
+
+
+
+
+**Joint consideration of differentiation in both load and adaptive variation**
+
+
+```{r}
+pops <- c("BERG", "BPNP", "CCRO", "CEBO", "GRLL", "JENN", "KBPP", "KLDR", "MOSQ", "PRDF", "ROME", "SPVY", "SSSP", "WLRD")
+
+up10.fst.allRuns <- read.csv(paste(outdir,"upper10/final172.sampleN8.allRuns.up10.nonSyn.Fst",sep="/"),header = T)
+drift.fst.allRuns <- read.csv(paste(outdir,"geneticLoad/drift/final172.sampleN8.allRuns.del.maf.0.75.Fst",sep="/"),header = T)
+
+df.meanFst <- NULL
+count1 <- 1
+count2 <- 1
+
+for (pop1 in pops)
+{
+  count1 <- count1+1
+  count2 <- 1
+  for (pop2 in pops)
+  {
+    count2 <- count2+1
+    if (count2 > count1)
+    {
+      if (pop1 != pop2)
+      {
+        df1 <- up10.fst.allRuns %>%
+          filter(Pop1 == pop1 & Pop2 == pop2) %>%
+          mutate(PopID=paste(pop1,pop2,sep="_")) %>%
+          group_by(PopID) %>%
+          summarise(meanFst=mean(weightFst), sdFst=sd(weightFst)) %>%
+          as.data.frame() %>%
+          mutate(Pop1 = sub("_(.*)", "", PopID),
+               Pop2 = sub(".*_(.*)", "\\1", PopID)) %>%
+          select(!PopID) %>%
+          select(Pop1,Pop2,meanFst,sdFst)
+
+      
+        df2 <- drift.fst.allRuns %>%
+          filter(Pop1 == pop1 & Pop2 == pop2) %>%
+          mutate(PopID=paste(pop1,pop2,sep="_")) %>%
+          group_by(PopID) %>%
+          summarise(meanFst=mean(weightFst), sdFst=sd(weightFst)) %>%
+          as.data.frame() %>%
+          mutate(Pop1 = sub("_(.*)", "", PopID),
+               Pop2 = sub(".*_(.*)", "\\1", PopID)) %>%
+          select(!PopID) %>%
+          select(Pop1,Pop2,meanFst,sdFst)
+      
+        df3 <- data.frame(Pop1=pop1,Pop2=pop2,up10_meanFst=df1$meanFst,up10_sdFst=df1$sdFst,
+                        drift_meanFst=df2$meanFst,drift_sdFst=df2$sdFst)
+      
+        df.meanFst <- rbind(df.meanFst,df3)
+      }
+    }
+  }
+}
+
+write.csv(df.meanFst,paste(outdir,"tables","df.meanFst.csv",sep="/"),quote=F,row.names=F)
+
+# Plot recipeints
+plot_list <- list()
+for (pop in pops)
+{
+  df <- df.meanFst[which(df.meanFst$Pop1==pop | df.meanFst$Pop2 == pop),] %>%
+    distinct() 
+  
+  df_update <- df %>%
+    mutate(
+    Pop3 = if_else(Pop1 == pop, Pop2, Pop1),
+    Pop2 = if_else(Pop1 == pop, Pop1, Pop2),
+    Pop1= Pop3) %>%
+    rename("Donor" = "Pop1",
+           "Recipient" = "Pop2")
+    
+
+  
+  df_update <- df_update %>%
+    left_join(sampleSites, by = c("Donor" = "Pop")) 
+  
+  lab.order <- sampleSites[-which(sampleSites$Pop == pop),]
+  p1 <- df_update %>%
+    mutate(Donor = factor(Donor, levels = lab.order$Pop)) %>%
+    ggplot(aes(x=up10_meanFst, y=drift_meanFst, fill=Donor), color="black")+
+    geom_vline(xintercept = mean(df_update$up10_meanFst),linetype=2)+
+    geom_hline(yintercept = mean(df_update$drift_meanFst),linetype=2)+
+    geom_point(color="black", size=7,  shape=21)+
+    theme_classic(base_size = 22)+
+    scale_fill_manual(values = lab.order$LabelCol)+
+    scale_x_continuous(limits=c(0,0.5),breaks = seq(0, 0.5, by=0.05))+
+    scale_y_continuous(limits=c(0,0.65),breaks = seq(0, 0.65, by=0.05))+
+    geom_text_repel(label=df_update$Donor, max.overlaps = 10, box.padding = 0.5, size=5)+
+    ggtitle(df_update$Recipient)+
+    labs(x=expression(paste("upper10% non-synonymous Fst")),
+         y=expression(paste("Deleterious Fst (with MAF > 0.75 in recipient)")))+
+    theme(legend.title=element_blank(),
+          axis.text = element_text(size=15),
+          legend.position = "none")
+  
+  plot_list[[pop]] <- p1
+  
+  pdf(file = paste(outdir,"/figures/fst/",pop,".recipient.geneComp.pdf",sep=""), width = 10,height = 10)
+  print(p1)
+  dev.off()
+}
+
+```
+
+```{r, results='hide'}
+#| label: fig-khanFstPlot
+#| fig-cap: "$F_{ST}$ based compatibility assessment of different donor populations. The genomic compatibility of different donor populations was assessed for the three recipient populations: (A) CEBO, (B) PRDF, and (C) SPVY based on the levels of differentiation at both adaptive SNPs in upper10% genes and at SNPs where deleterious allele is nearly fixed in the recipient population (MAF > 0.75).  "
+#| fig-height: 24
+#| fig-width: 9
+
+
+grid.arrange(plot_list[["CEBO"]], plot_list[["PRDF"]],plot_list[["SPVY"]],layout_matrix = matrix(c(1, 2, 3),nrow=3))
+
+```
+
+
+Summary of impact of genetic augmentation on recipient populations in terms of numbers of variants with negative and positive fitness-related effects.
+
+```{r}
+#| label: fig-ImpactSummary
+#| fig-cap: "Summary of impact of genetic augmentation on recipient populations in terms of numbers of variants with negative and positive fitness-related effects. "
+#| fig-height: 15
+#| fig-width: 21
+
+plot_list3 <- list()
+table.genAug <- list()
+df.genCom <- NULL
+for (don in c("KLDR","WLRD"))
+{
+  df.muts <- NULL
+  for (mut in c("nonsense","deleterious"))
+  {
+    df1 <- table_list1[paste(don,mut,sep = "_")]
+    df2 <- table_list3[paste(don,mut,sep = "_")]
+    
+    df1a <- df1[[1]] %>%
+      dplyr::select(RecPop,meanL_add,sdL_add,meanA_add,sdA_add,DonPop) %>%
+      filter(RecPop %in% c("CEBO","PRDF","SPVY"))
+    
+    df2a <- df2[[1]] %>%
+      dplyr::select(RecPop,meanMmask_p1,sdMmask_p1,DonPop) %>%
+      filter(RecPop %in% c("CEBO","PRDF","SPVY"))
+    
+    df3 <- inner_join(df1a,df2a,by=c("RecPop","DonPop")) %>%
+      mutate(Type=mut)
+    df.muts <- rbind(df.muts,df3)
+  }
+  df.genCom <- rbind(df.genCom,df.muts)
+  summary_df <- df.muts %>%
+  group_by(Type) %>%
+  summarise(
+    mean_L_add = mean(meanL_add),
+    sd_L_add = sd(meanL_add),
+    mean_A_add = mean(meanA_add),
+    sd_A_add = sd(meanA_add),
+    mean_Mmask_p1 = mean(meanMmask_p1),
+    sd_Mmask_p1 = sd(meanMmask_p1)) %>%
+    as.data.frame()
+
+  summary_df2 <- summary_df %>%
+    select(Type,mean_L_add,mean_A_add,mean_Mmask_p1)
+  
+  summary_df2 <- rbind(summary_df, data.frame(
+  Type = "adaptive",
+  mean_L_add = NA,
+  sd_L_add = NA,
+  mean_A_add = NA,
+  sd_A_add = NA,
+  mean_Mmask_p1 = NA,
+  sd_Mmask_p1 = NA))
+  
+  summary_df2$mean_A_add <- c(NA,NA,summary_df$mean_A_add[1]) 
+  summary_df2$sd_A_add <- c(NA,NA,summary_df$sd_A_add[1]) 
+  
+  df_long1 <- summary_df2 %>%
+  pivot_longer(cols = starts_with("mean"), names_to = "Measurement", values_to = "Value1") %>%
+    as.data.frame()
+  
+  df_long1 <- df_long1 %>%
+  mutate(Value1 = ifelse(Measurement == "mean_L_add", -Value1, Value1))
+  
+  df_long1$Type <- recode(df_long1$Type, 
+                         "nonsense" = "LoF",
+                         "deleterious" = "damaging missense")
+  
+  df_long1$Measurement <- recode(df_long1$Measurement,
+                                       "mean_L_add" = "Deleterious mutations added",
+                                       "mean_Mmask_p1" = "Deleterious mutations masked",
+                                       "mean_A_add" = "Adaptive mutations added")
+
+  # Create the stacked barplot
+  df_long1$Type <- factor(df_long1$Type, levels = c("LoF", "damaging missense","adaptive"))
+  df_long1$Measurement <- factor(df_long1$Measurement, levels = c("Deleterious mutations added", "Deleterious mutations masked","Adaptive mutations added"))
+  
+  table.genAug[[paste(don,mut,sep = "_")]] <- df_long1
+  
+  p <- ggplot(df_long1, aes(x = Measurement, y = Value1, fill = Type)) +
+      geom_bar(stat = "identity", position = "stack", color="black") +
+    #geom_errorbar(aes(ymin=Value1-sdP_mask, ymax=Value1+sdP_mask), width=0.3,size=0.5,
+    #            position=position_dodge(0.9))
+      labs(x = "", y = "No.of mutations", fill = "Type") +
+      theme_classic(base_size = 22)+coord_flip()+
+      scale_fill_manual(values = c("LoF" = "tomato4", "damaging missense" = "tomato", "adaptive" = "lightgreen"))+
+      geom_hline(yintercept = 0, size = 1.5)
+  
+  plot_list3[[don]] <- p
+}
+
+plot_list3[["KLDR"]] <- plot_list3[["KLDR"]] +
+  ggtitle(paste("(A) KLDR"))+
+      scale_y_continuous(limits=c(-700,200),breaks = c(seq(-700, 0, by=100),seq(0, 200, by=50)),labels = abs)
+
+plot_list3[["WLRD"]] <- plot_list3[["WLRD"]] +
+  ggtitle(paste("(B) WLRD"))+
+      scale_y_continuous(limits=c(-700,200),breaks = c(seq(-700, 0, by=100),seq(0, 200, by=50)),labels = abs)
+
+
+Fig5 <- ggarrange(plotlist = plot_list3,ncol=1,nrow = 2, common.legend = T,align = "hv")
+Fig5
+ggsave(paste(outdir,"figures","net_genAugmentation.pdf",sep="/"), Fig5, width = 21, height = 9)
+
+write.csv(df.genCom,paste(outdir,"tables","donor_rec_mutations.csv",sep="/"),quote=F,row.names=F)
+```
+
+
+
+## Supplementary figures
+
+#### Masked Load ($load_M$)
+
+```{r}
+#| label: fig-supp1
+#| fig-cap: "Masked Load for (A) LoF and (B) damaging missense mutations.  "
+#| fig-height: 12
+#| fig-width: 15
+
+pA <- df.Load %>%
+  left_join(sampleSites,by="Pop") %>%
+  filter(Mutation == "nonsense") %>%
+  ggplot(aes(x=Pop,y=loadM,fill=Pop))+
+  geom_boxplot(alpha = 0.5,outlier.shape = NA,position = "identity",width = 0.7)+
+  geom_point(position=position_jitterdodge(), size=3,aes(color=Pop),color="black",pch=21)+
+  labs(x="Pop", y = expression(paste(L[masked])))+
+  theme_bw(base_size = 22)+
+  scale_y_continuous(labels =comma, breaks = pretty(df.Load$loadM[which(df.Load$Mutation=="nonsense")], n = 10))+
+  scale_fill_manual(values = sampleSites$LabelCol)+
+  scale_color_manual(values = sampleSites$LabelCol)+
+  theme(axis.title.x=element_blank(),
+        axis.text.x = element_text(size = 12),
+        legend.title=element_blank(),
+        legend.position = "none")+
+  ggtitle("(A) LoF")
+
+pB <- df.Load %>%
+  left_join(sampleSites,by="Pop") %>%
+  filter(Mutation == "deleterious") %>%
+  ggplot(aes(x=Pop,y=loadM,fill=Pop))+
+  geom_boxplot(alpha = 0.5,outlier.shape = NA,position = "identity",width = 0.7)+
+  geom_point(position=position_jitterdodge(), size=3,aes(color=Pop),color="black",pch=21)+
+  labs(x="Pop", y = expression(paste(L[masked])))+
+  theme_bw(base_size = 22)+
+  scale_y_continuous(labels =comma, breaks = pretty(df.Load$loadM[which(df.Load$Mutation=="deleterious")], n = 10))+
+  scale_fill_manual(values = sampleSites$LabelCol)+
+  scale_color_manual(values = sampleSites$LabelCol)+
+  theme(axis.title.x=element_blank(),
+        axis.text.x = element_text(size = 12),
+        legend.title=element_blank(),
+        legend.position = "none")+
+  ggtitle("(B) Damaging Missense")
+
+FigS1 <- grid.arrange(pA,pB,nrow = 2)
+ggsave(paste(outdir,"figures","FigureS1.pdf",sep="/"), FigS1, width = 14, height = 12)
+
+```
+
+
+#### $R_{xy}$
+
+Analysis Based on: [@xue2015mountain]
+In order to investigate the effects of low diversity and inbreeding on selection in
+*S catenatus* populations, we carried out a comparative analysis of mutations at functional loci, looking at different categories of genomic site as identified by annotation
+
+We began by calculating a statistic which compares two populations, given a particular category of sites, in terms of the number of derived alleles found at sites within that category in one population rather than the other.
+
+Specifically, at each site i we write the observed derived allele frequency in population X
+as
+
+$f^X_i =  d^X_i/n^X_i$
+
+where $n^X_i$ is the total number of alleles called there in population X and $d^X_i$i is the number of derived alleles called. Similarly we define $f^Y_i$ in population Y. Then if $C$ is a particular category of protein-coding sites and $S$ a set of synonymous sites, we define
+
+
+$L_{X,Y}(C) = \frac{\sum_{i \in c}f^X_i(1-f^Y_i)}{\sum_{j \in S}f^X_i(1-f^Y_i)}$
+
+We then define the following ratio:
+
+$R_{X/Y}(C) = \frac{L_{X,Y}(C)}{L_{Y,X}(C)}$
+
+as a measure of the relative number of derived alleles found more often in population A
+compared to population B.
+
+
+
+```{r}
+#To calculate Rxy statistics
+
+# From Xue et al. (2015) 10.1126/science.aaa3952
+
+
+# Rxy.del <- NULL
+# Rxy.LoF <- NULL
+
+# for (pop1 in pops)
+# {
+#   for (pop2 in pops)
+#   {
+#       if (pop1 != pop2)
+#       {
+#         # deleterious DAFs
+#         del_name <- paste("del_",pop1,"_",pop2,sep="")
+#         p1.del.freq <- read.table(paste(paste(outdir,"geneticLoad","freq/",sep="/"),
+#                                         pop1,".deleterious.freq",sep=""),header=F) %>%
+#           select(V1,V2,V4,V7) %>%
+#           dplyr::rename("CHROM" = "V1",
+#                         "POS" = "V2",
+#                         "Nchr" = "V4",
+#                         "DAF" = "V7") %>%
+#           filter(!is.na(DAF))
+          
+          
+        
+        
+#         p2.del.freq <- read.table(paste(paste(outdir,"geneticLoad","freq/",sep="/"),
+#                                         pop2,".deleterious.freq",sep=""),header=F)%>%
+#           select(V1,V2,V4,V7) %>%
+#           dplyr::rename("CHROM" = "V1",
+#                         "POS" = "V2",
+#                         "Nchr" = "V4",
+#                         "DAF" = "V7") %>%
+#           filter(!is.na(DAF))
+        
+#         df1 <- inner_join(p1.del.freq,p2.del.freq,by=c("CHROM","POS")) %>%
+#           filter(!(DAF.x == 0 & DAF.y == 0))
+
+#         assign(del_name,df1)
+        
+#         # Synonymous DAFs
+        
+#         syn_name <- paste("syn_",pop1,"_",pop2,sep="")
+#         p1.syn.freq <- read.table(paste(paste(outdir,"geneticLoad","freq/",sep="/"),
+#                                         pop1,".Syn.freq",sep=""),header=F) %>%
+#           select(V1,V2,V4,V7) %>%
+#           dplyr::rename("CHROM" = "V1",
+#                         "POS" = "V2",
+#                         "Nchr" = "V4",
+#                         "DAF" = "V7") %>%
+#           filter(!is.na(DAF))
+          
+          
+        
+        
+#         p2.syn.freq <- read.table(paste(paste(outdir,"geneticLoad","freq/",sep="/"),
+#                                         pop2,".Syn.freq",sep=""),header=F)%>%
+#           select(V1,V2,V4,V7) %>%
+#           dplyr::rename("CHROM" = "V1",
+#                         "POS" = "V2",
+#                         "Nchr" = "V4",
+#                         "DAF" = "V7") %>%
+#           filter(!is.na(DAF))
+        
+#         df2 <- inner_join(p1.syn.freq,p2.syn.freq,by=c("CHROM","POS")) %>%
+#           filter(!(DAF.x == 0 & DAF.y == 0))
+
+#         assign(syn_name,df2)
+        
+        
+        
+#          # LoF DAFs
+        
+#         lof_name <- paste("lof_",pop1,"_",pop2,sep="")
+#         p1.lof.freq <- read.table(paste(paste(outdir,"geneticLoad","freq/",sep="/"),
+#                                         pop1,".nonsense.freq",sep=""),header=F) %>%
+#           select(V1,V2,V4,V7) %>%
+#           dplyr::rename("CHROM" = "V1",
+#                         "POS" = "V2",
+#                         "Nchr" = "V4",
+#                         "DAF" = "V7") %>%
+#           filter(!is.na(DAF))
+          
+          
+        
+        
+#         p2.lof.freq <- read.table(paste(paste(outdir,"geneticLoad","freq/",sep="/"),
+#                                         pop2,".nonsense.freq",sep=""),header=F)%>%
+#           select(V1,V2,V4,V7) %>%
+#           dplyr::rename("CHROM" = "V1",
+#                         "POS" = "V2",
+#                         "Nchr" = "V4",
+#                         "DAF" = "V7") %>%
+#           filter(!is.na(DAF))
+        
+#         df3 <- inner_join(p1.lof.freq,p2.lof.freq,by=c("CHROM","POS")) %>%
+#           filter(!(DAF.x == 0 & DAF.y == 0))
+
+#         assign(lof_name,df3)
+        
+        
+#         #Calculate Rxy
+        
+#         del <- get(del_name)
+#         lof <- get(lof_name)
+#         syn <- get(syn_name)
+        
+#         l_del_xy <- sum(del$DAF.x*(1-del$DAF.y))/sum(syn$DAF.x*(1-syn$DAF.y))
+#         l_del_yx <- sum(del$DAF.y*(1-del$DAF.x))/sum(syn$DAF.y*(1-syn$DAF.x))
+#         r_del_xy <- l_del_xy/l_del_yx
+        
+#         l_lof_xy <- sum(lof$DAF.x*(1-lof$DAF.y))/sum(syn$DAF.x*(1-syn$DAF.y))
+#         l_lof_yx <- sum(lof$DAF.y*(1-lof$DAF.x))/sum(syn$DAF.y*(1-syn$DAF.x))
+#         r_lof_xy <- l_lof_xy/l_lof_yx
+        
+#         # Divide by chromosome
+        
+#         r_del <- vector()
+#         r_lof <- vector()
+
+#         chr <- unique(del$CHROM)
+#         for (k in 1:length(chr))
+#         {
+#           d <- del[which(del$CHROM != chr[k]),]
+#           s <- syn[which(syn$CHROM != chr[k]),]
+#           l_del_xy <- sum(d$DAF.x*(1-d$DAF.y))/sum(s$DAF.x*(1-s$DAF.y))
+#           l_del_yx <- sum(d$DAF.y*(1-d$DAF.x))/sum(s$DAF.y*(1-s$DAF.x))
+#           r_del[k] <- l_del_xy/l_del_yx
+#         }
+#         r_df.del <- data.frame(PopPairs=paste(pop1,"-",pop2,sep=""),Rdel=r_del)
+        
+        
+#         chr <- unique(lof$CHROM)
+#         for (k in 1:length(chr))
+#         {
+#           lf <- lof[which(lof$CHROM != chr[k]),]
+#           s <- syn[which(syn$CHROM != chr[k]),]
+#           l_lof_xy <- sum(lf$DAF.x*(1-lf$DAF.y))/sum(s$DAF.x*(1-s$DAF.y))
+#           l_lof_yx <- sum(lf$DAF.y*(1-lf$DAF.x))/sum(s$DAF.y*(1-s$DAF.x))
+#           r_lof[k] <- l_lof_xy/l_lof_yx
+#         }
+#         r_df.LoF <- data.frame(PopPairs=paste(pop1,"-",pop2,sep=""),Rlof=r_lof)
+        
+#       }
+      
+#       Rxy.del <- rbind(Rxy.del,r_df.del)
+#       Rxy.LoF <- rbind(Rxy.LoF,r_df.LoF)
+#   }
+# }
+
+#write.csv(Rxy.del,paste(outdir,"tables","Rxy.del.csv",sep="/"),quote=F,row.names=F)
+#write.csv(Rxy.LoF,paste(outdir,"tables","Rxy.LoF.csv",sep="/"),quote=F,row.names=F)
+
+
+```
+
+```{r}
+#| label: fig-supp2
+#| fig-cap: "$R_{XY}$ values for different population pair"
+#| fig-height: 6
+#| fig-width: 15
+
+Rxy.del <- read.csv(paste(outdir,"tables","Rxy.del.csv",sep="/"),header = T)
+Rxy.LoF <- read.csv(paste(outdir,"tables","Rxy.LoF.csv",sep="/"),header = T)
+
+# Rxy plot – but just for KLDR and WILLARD (as X) versus each of CEBO, PRDF and SPVY populations (as Y pops). Do separately for a) missense and b) LOF mutations (like Fig. 2C in Khan et al). #
+
+pop_x <- c("KLDR","WLRD")
+pop_y <- c("CEBO","PRDF","SPVY")
+pop_xy <- c("KLDR-CEBO","KLDR-PRDF","KLDR-SPVY",
+            "WLRD-CEBO","WLRD-PRDF","WLRD-SPVY")
+
+Rxy.del.mean <-Rxy.del %>%
+  group_by(PopPairs) %>%
+  dplyr::summarise(meanRxy.del = mean(Rdel),sdRxy.del=sd(Rdel)) %>%
+  as.data.frame()
+
+Rxy.LoF.mean <-Rxy.LoF %>%
+  group_by(PopPairs) %>%
+  dplyr::summarise(meanRxy.LoF = mean(Rlof),sdRxy.LoF=sd(Rlof)) %>%
+  as.data.frame()
+
+
+Rxy.mean <- inner_join(Rxy.del.mean,Rxy.LoF.mean,by="PopPairs")
+
+
+Rxy.del.filt <- Rxy.del %>%
+  filter(PopPairs %in% pop_xy)
+
+Rxy.LoF.filt <- Rxy.LoF %>%
+  filter(PopPairs %in% pop_xy)
+
+p1 <- ggplot(Rxy.LoF.filt,aes(x=PopPairs,y=Rlof,fill=PopPairs))+
+  geom_boxplot(alpha = 0.5,outlier.shape = NA)+
+  labs(x="PopPair(X-Y)", y = expression(paste(R[XY])))+
+  scale_y_continuous(labels =comma, breaks = pretty(Rxy.LoF.filt$Rlof, n = 5))+
+  theme_classic(base_size = 15)+
+  geom_hline(yintercept=1, linetype="dashed")+
+  coord_flip()+
+  scale_x_discrete(limits = rev)+
+  #scale_fill_manual(values = df$Color)+
+  #scale_color_manual(values = df$Color)+
+  theme(legend.title=element_blank(),
+        axis.text.y = element_text(size = 15),
+        legend.position = "none")+
+  ggtitle("(A) LoF")
+
+p2 <- ggplot(Rxy.del.filt,aes(x=PopPairs,y=Rdel,fill=PopPairs))+
+  geom_boxplot(alpha = 0.5,outlier.shape = NA)+
+  labs(x="PopPair(X-Y)", y = expression(paste(R[XY])))+
+  scale_y_continuous(labels =comma, breaks = pretty(Rxy.del.filt$Rdel, n = 5))+
+  theme_classic(base_size = 15)+
+  geom_hline(yintercept=1, linetype="dashed")+
+  coord_flip()+
+  scale_x_discrete(limits = rev)+
+  #scale_fill_manual(values = df$Color)+
+  #scale_color_manual(values = df$Color)+
+  theme(legend.title=element_blank(),
+        axis.text.y = element_text(size = 15),
+        legend.position = "none")+
+  ggtitle("(B) Damaging Missense")
+
+
+
+FigS2 <- grid.arrange(p1,p2,ncol = 2)
+ggsave(paste(outdir,"figures","FigureS2.pdf",sep="/"), FigS2, width = 18, height = 6)
+```
+
+### P-values
+
+#### Load
+
+```{r}
+
+
+plots_list <- list()
+pval_list <- list()
+
+for (mut in c("nonsense","deleterious"))
+{
+  df <- df.Load %>%
+  filter(Mutation == mut) 
+  test.loadM <- pairwise.wilcox.test(df$loadM, df$Pop,p.adjust.method = "fdr")
+  test.loadR <- pairwise.wilcox.test(df$loadR, df$Pop,p.adjust.method = "fdr")
+  
+  p.loadM <- test.loadM$p.value
+  p.loadR <- test.loadR$p.value
+  
+  p.loadM.mat <- matrix(p.loadM, nrow = length(unique(df$Pop))-1, byrow = TRUE)
+  p.loadR.mat <- matrix(p.loadM, nrow = length(unique(df$Pop))-1, byrow = TRUE)
+  
+  df1.pval <- p.loadM %>%
+    as.data.frame() %>%
+    rownames_to_column(var=" ")
+  
+  df2.pval <- p.loadR %>%
+    as.data.frame() %>%
+    rownames_to_column(var=" ")
+  
+  pval_list[[paste(mut,"loadM",sep="-")]] <- df1.pval
+  pval_list[[paste(mut,"loadR",sep="-")]] <- df2.pval
+  
+  heatmap1 <- data.frame(
+    Group1 = rep(rownames(p.loadM), each = ncol(p.loadM)),
+    Group2 = rep(colnames(p.loadM), times = nrow(p.loadM)),
+    P_Value = as.vector(p.loadM.mat))
+  
+  heatmap2 <- data.frame(
+    Group1 = rep(rownames(p.loadR), each = ncol(p.loadR)),
+    Group2 = rep(colnames(p.loadR), times = nrow(p.loadR)),
+    P_Value = as.vector(p.loadR.mat))
+  
+  p1 <- ggplot(heatmap1, aes(x = Group1, y = Group2, fill = -log10(P_Value))) +
+    geom_tile(linewidth = ifelse(heatmap1$P_Value < quantile(heatmap1$P_Value, 0.05, na.rm=T), 1, 0), color="black") +
+    scale_fill_gradient(
+      name = "-log10(P-Value)",
+      low = "white", high = "darkorchid3",
+      limits = c(0, max(-log10(heatmap1$P_Value), na.rm = TRUE)),
+      na.value = "gray50") +
+    theme_bw(base_size = 22)+
+    theme(legend.position="bottom")+
+    labs(x="",y="",subtitle = "LoF")+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 15),
+        axis.text.y = element_text(size = 15),
+        legend.text = element_text(size=15),
+        legend.title = element_text(size=15),
+        legend.key.size = unit(1.5, "cm"))+
+    ggtitle("(A) Masked Load")
+  
+  p2 <- ggplot(heatmap2, aes(x = Group1, y = Group2, fill = -log10(P_Value))) +
+    geom_tile(linewidth = ifelse(heatmap2$P_Value < quantile(heatmap2$P_Value, 0.05, na.rm=T), 1, 0), color="black") +
+    scale_fill_gradient(
+      name = "-log10(P-Value)",
+      low = "white", high = "darkorchid3",
+      limits = c(0, max(-log10(heatmap2$P_Value), na.rm = TRUE)),
+      na.value = "gray50") +
+    theme_bw(base_size = 22)+
+    theme(legend.position="bottom")+
+    labs(x="",y="", subtitle = "Damaging Missense")+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 15),
+        axis.text.y = element_text(size = 15),
+        legend.text = element_text(size=15),
+        legend.title = element_text(size=15),
+        legend.key.size = unit(1.5, "cm"))+
+    ggtitle("(B) Realized Load")
+  
+  plots_list[[mut]] <- ggarrange(p1,p2,ncol = 2,common.legend=T,legend="right")
+
+
+}
+write_xlsx(pval_list,path = paste(outdir,"tables","pvalue_load.xlsx",sep="/"))
+
+
+#FigS3 <- ggarrange(plotlist = plots_list,nrow = 2)
+#FigS3
+```
+
+### Alignment stats
+
+```{r}
+
+mapStats <- read.csv(paste(resources,"all202.SeqStats.csv",sep="/"),header=T) %>%
+  filter(INDV %in% sampleInfo$SampleID)
+
+mean(mapStats$MeanDepth) # 15.27648
+
+sd(mapStats$MeanDepth) # 3.335274
+
+mean(mapStats$Breadth_10x) # 77.76
+
+sd(mapStats$Breadth_10x) # 9.58
+
+```
