@@ -3,9 +3,7 @@
 > **Evaluating genomic compatibility for conservation of the endangered Eastern Massasauga rattlesnake**
 
 [![DOI](https://img.shields.io/badge/DOI-10.1111%2Fmec.70014-blue)](https://doi.org/10.1111/mec.70014)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
-[![R](https://img.shields.io/badge/R-4.0%2B-blue.svg)](https://www.r-project.org/)
+
 
 ## 📋 Table of Contents
 
