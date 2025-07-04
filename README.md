@@ -30,7 +30,7 @@ Our genomic approach evaluates the genetic consequences of mixing populations to
 
 ## 📖 Publication
 
-**Mathur, S., & Gibbs, H. L. (2025).** *Genomic evaluation of assisted gene flow options in an endangered rattlesnake.* **Molecular Ecology.** [https://doi.org/10.1111/mec.70014](https://doi.org/10.1111/mec.70014){target=_blank}
+**Mathur, S., & Gibbs, H. L. (2025).** *Genomic evaluation of assisted gene flow options in an endangered rattlesnake.* **Molecular Ecology.** [https://doi.org/10.1111/mec.70014](https://doi.org/10.1111/mec.70014)
 
 ## 🔬 Key Features
 
