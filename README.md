@@ -115,7 +115,7 @@ install.packages(c("tidyverse", "ggplot2", "dplyr", "readr",
 ##  Support
 
 For questions about this analysis framework:
-- **Primary contact**: [Samarth Mathur](www.github.com/samarth8392)
+- **Primary contact**: [Samarth Mathur](https://github.com/samarth8392)
 - **Lab website**: [Gibbs Lab, Ohio State University](https://u.osu.edu/gibbslab/)
 - **Issues**: Please use GitHub Issues for technical problems
 
