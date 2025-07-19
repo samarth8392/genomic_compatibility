@@ -1,130 +1,122 @@
-# 🧬 Genomic Compatibility for Assisted Gene Flow
-
-> **Evaluating genomic compatibility for conservation of the endangered Eastern Massasauga rattlesnake**
-
+# Genomic Compatibility Analysis for Assisted Gene Flow
 [![DOI](https://img.shields.io/badge/DOI-10.1111%2Fmec.70014-blue)](https://doi.org/10.1111/mec.70014)
 
+This repository contains scripts and data used for the genomic evaluation of assisted gene flow options in endangered Eastern Massasauga rattlesnakes (*Sistrurus catenatus*). The analysis framework assesses genetic compatibility between potential donor and recipient populations for conservation translocation programs.
 
-## 📋 Table of Contents
+**Keywords**: conservation genomics, assisted gene flow, genetic compatibility, population genetics, endangered species, rattlesnake, genomic analysis, GATK pipeline
 
-- [🧬 Genomic Compatibility for Assisted Gene Flow](#-genomic-compatibility-for-assisted-gene-flow)
-  - [📋 Table of Contents](#-table-of-contents)
-  - [🐍 About](#-about)
-  - [📖 Publication](#-publication)
-  - [🔬 Key Features](#-key-features)
-  - [🗂️ Repository Structure](#️-repository-structure)
-    - [Scripts](#scripts)
-  - [🔍 Key Analyses](#-key-analyses)
-    - [🧪 Functional Variant Classification](#-functional-variant-classification)
-    - [📊 Population Genomics Metrics](#-population-genomics-metrics)
-    - [🎯 Adaptive Genomics](#-adaptive-genomics)
-  - [📈 Results Highlights](#-results-highlights)
-  - [📧 Contact](#-contact)
-  - [🐍 Species Conservation](#-species-conservation)
+## Table of Contents
 
-## 🐍 About
+- [Citation](#citation)
+- [Research Overview](#research-overview)
+- [Repository Structure](#repository-structure)
+- [Prerequisites](#prerequisites)
+- [Interpretation Guide](#interpretation-guide)
+- [Related Resources](#related-resources)
+- [Support](#support)
+- [Species Conservation](#species-conservation)
 
-This repository contains the complete computational pipeline for assessing genomic compatibility in assisted gene flow strategies for the **Eastern Massasauga rattlesnake** (*Sistrurus catenatus*) - a critically endangered species facing habitat fragmentation and population decline.
 
-Our genomic approach evaluates the genetic consequences of mixing populations to inform evidence-based conservation decisions and optimize genetic rescue efforts.
+## Citation
 
-## 📖 Publication
+**Mathur, S., & Gibbs, H. L. (2025).** Genomic evaluation of assisted gene flow options in an endangered rattlesnake. *Molecular Ecology*. [https://doi.org/10.1111/mec.70014](https://doi.org/10.1111/mec.70014)
 
-**Mathur, S., & Gibbs, H. L. (2025).** *Genomic evaluation of assisted gene flow options in an endangered rattlesnake.* **Molecular Ecology.** [https://doi.org/10.1111/mec.70014](https://doi.org/10.1111/mec.70014)
 
-## 🔬 Key Features
+## Research Overview
 
-- **Comprehensive Variant Analysis**: From raw sequencing data to functional variant annotation
-- **Population Genomics**: Multi-population comparison and genetic diversity assessment  
-- **Functional Genomics**: Identification of deleterious mutations and adaptive genes
-- **Conservation Genomics**: Genomic compatibility metrics for assisted gene flow
-- **Reproducible Pipeline**: End-to-end workflow with quality control and visualization
+This study introduces a novel genomic approach to evaluate genetic compatibility for assisted gene flow by analyzing:
+- **Deleterious variants**: Mutations potentially harmful to fitness
+- **Adaptive variants**: Genetic variants likely under positive selection
+- **Local adaptation**: Population-specific beneficial alleles
+- **Genetic load**: Burden of harmful mutations
 
-## 🗂️ Repository Structure
+### Key Research Questions
+1. What is the genetic impact of introducing individuals from donor populations to recipient populations?
+2. How many novel deleterious and adaptive variants would be introduced?
+3. What are the effects on masking/unmasking existing deleterious mutations?
+4. What is the potential for outbreeding depression through disruption of local adaptation?
+
+## 📁 Repository Structure
 
 ```
 genomic_compatibility/
-├── 📁 metadata/              # Sample information and annotations
-│   ├── 📊 Data1.csv          # Primary dataset
-│   ├── 📋 final152.sampleList.csv  # Complete sample list
-│   ├── 🧬 Scate_HiC.genes.txt      # Reference genome annotations
-│   ├── 📁 SNP_pos/           # Variant position files by functional category
-│   └── 🎯 upp10_geneCoord.bed.txt  # Adaptive gene coordinates
-├── 📁 scripts/               # Analysis pipeline scripts
-│   ├── 📁 01_preprocess/     # Data preprocessing & alignment
-│   ├── 📁 02_filterNstats/   # Quality control & filtering
-│   ├── 📁 03_functionalVariation/  # Functional annotation
-│   └── 📊 scatenatus_GA_0910.qmd   # Main analysis & visualization
-└── 📄 README.md              # This file
+├── metadata/                           # Metadata and annotation files
+│   ├── Data1.csv                      # Sample metadata
+│   ├── SNP_pos/                       # SNP position files by variant type
+│   │   ├── final152.Syn.pos.txt      # Synonymous mutations
+│   │   ├── final152.deleterious.pos.txt  # Deleterious mutations (LOF + PROVEAN damaging)
+│   │   ├── final152.missense.pos.txt     # Missense mutations
+│   │   ├── final152.nonSyn.pos.txt       # Non-synonymous mutations
+│   │   └── final152.nonsense.pos.txt     # Loss-of-function mutations
+│   ├── Scate_HiC.genes.txt           # Reference genome gene annotations
+│   ├── final152.sampleList.csv       # Complete sample information
+│   ├── upp10_geneCoord.bed.txt       # Coordinates of top 10% DOS genes (adaptive)
+│   └── upper10_geneInfo.csv          # Information on adaptive genes
+└── scripts/                           # Analysis pipeline scripts
+    ├── 01_preprocess/                 # Raw data preprocessing
+    ├── 02_filterNstats/              # Quality filtering and statistics
+    ├── 03_functionalVariation/       # Functional annotation and analysis
+    └── scatenatus_GA_0910.qmd       # Quarto notebook for downstream analysis
 ```
 
 
-### Scripts
+## Prerequisites
 
-1. **Data Preprocessing**
-   ```bash
-   cd scripts/01_preprocess/
-   bash 01_adapter_removal.sh
-   bash 02_alignment.sh
-   bash 03_haplotypeCaller.sh
-   ```
+### Software Requirements
+- **GATK** (≥4.0): Variant calling and processing
+- **BWA**: Read alignment
+- **Trimmomatic**: Adapter removal and quality trimming
+- **SnpEff**: Functional annotation
+- **PROVEAN**: Pathogenicity prediction
+- **Samtools**: BAM file manipulation
+- **Bcftools**: VCF file processing
+- **R** (≥4.0): Statistical analysis and visualization
+- **Quarto**: Reproducible document generation
 
-2. **Quality Control & Filtering**
-   ```bash
-   cd ../02_filterNstats/
-   bash 01_mapstats.sh
-   bash 02_filterVCF.sh
-   ```
-
-3. **Functional Analysis**
-   ```bash
-   cd ../03_functionalVariation/
-   bash 01_snpEff.sh
-   bash 02_provean.sh
-   ```
-
-4. **Downstream Analysis & Visualization**
-   ```bash
-   quarto render scatenatus_GA_0910.qmd
-   ```
-
-## 🔍 Key Analyses
-
-### 🧪 Functional Variant Classification
-- **Synonymous**: Silent mutations (no amino acid change)
-- **Missense**: Amino acid substitutions
-- **Nonsense**: Premature stop codons
-- **Deleterious**: Loss-of-function + PROVEAN damaging variants
-
-### 📊 Population Genomics Metrics
-- Nucleotide diversity (π)
-- Genetic differentiation (FST)
-- Linkage disequilibrium patterns
-- Demographic history inference
-
-### 🎯 Adaptive Genomics
-- Detection of genes under selection
-- Functional enrichment analysis
-- Gene desert identification
-- Recombination rate variation
-
-## 📈 Results Highlights
-
-- **152 individuals** analyzed across multiple populations
-- **Genome-wide variant discovery** with functional annotation
-- **Population structure** and genetic diversity characterization
-- **Genomic compatibility assessment** for conservation strategies
+### R Packages
+```r
+# Required R packages (install before running Quarto notebook)
+install.packages(c("tidyverse", "ggplot2", "dplyr", "readr", 
+                   "genomics", "vcfR", "adegenet", "hierfstat"))
+```
 
 
-## 📧 Contact
+## Interpretation Guide
 
-**Samarth Mathur** 
-📧 mathur.112@osu.edu  
-🏛️ Ohio State University
+### Compatibility Metrics
 
-**H. Lisle Gibbs** - Principal Investigator  
-📧 gibbs.128@osu.edu  
-🏛️ Ohio State University
+1. **Novel Deleterious Variants**: Number of new harmful mutations introduced to recipient population
+2. **Novel Adaptive Variants**: Number of potentially beneficial mutations introduced
+3. **Masking Effects**: Number of existing deleterious mutations that become masked (heterozygous)
+4. **Unmasking Effects**: Number of existing deleterious mutations that become unmasked (homozygous)
+
+### Decision Framework
+
+**Favorable for assisted gene flow**:
+- High introduction of adaptive variants
+- Low introduction of deleterious variants
+- Positive masking effects
+- Minimal disruption of local adaptation
+
+**Unfavorable for assisted gene flow**:
+- High genetic load introduction
+- Loss of local adaptation
+- Excessive outbreeding depression risk
+
+## Related Resources
+
+- **Raw sequence data**: NCBI BioProject [PRJNA1220313](https://www.ncbi.nlm.nih.gov/bioproject/PRJNA1220313)
+- **Published article**: [Molecular Ecology DOI: 10.1111/mec.70014](https://doi.org/10.1111/mec.70014)
+- **GATK Best Practices**: [https://gatk.broadinstitute.org/hc/en-us/sections/360007226651](https://gatk.broadinstitute.org/hc/en-us/sections/360007226651)
+- **SnpEff Documentation**: [https://pcingola.github.io/SnpEff/](https://pcingola.github.io/SnpEff/)
+
+##  Support
+
+For questions about this analysis framework:
+- **Primary contact**: [Samarth Mathur](www.github.com/samarth8392)
+- **Lab website**: [Gibbs Lab, Ohio State University](https://u.osu.edu/gibbslab/)
+- **Issues**: Please use GitHub Issues for technical problems
+
 
 ## 🐍 Species Conservation
 
@@ -133,3 +125,9 @@ The Eastern Massasauga rattlesnake is listed as **Threatened** under the U.S. En
 ---
 
 *⭐ If you find this repository useful for your research, please consider starring it and citing our paper!*
+
+- Conservation genetics community for feedback and collaboration
+
+---
+
+**Keywords**: conservation genomics, assisted gene flow, genetic compatibility, population genetics, endangered species, rattlesnake, genomic analysis, GATK pipeline
