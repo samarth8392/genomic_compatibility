@@ -36,7 +36,7 @@ This study introduces a novel genomic approach to evaluate genetic compatibility
 3. What are the effects on masking/unmasking existing deleterious mutations?
 4. What is the potential for outbreeding depression through disruption of local adaptation?
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 genomic_compatibility/
@@ -118,7 +118,7 @@ For questions about this analysis framework:
 - **Issues**: Please use GitHub Issues for technical problems
 
 
-## 🐍 Species Conservation
+## Species Conservation
 
 The Eastern Massasauga rattlesnake is listed as **Threatened** under the U.S. Endangered Species Act. This research contributes to evidence-based conservation strategies for this ecologically important species.
 
