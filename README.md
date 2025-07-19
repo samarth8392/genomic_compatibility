@@ -1,7 +1,9 @@
 # Genomic Compatibility Analysis for Assisted Gene Flow
-[![DOI](https://img.shields.io/badge/DOI-10.1111%2Fmec.70014-blue)](https://doi.org/10.1111/mec.70014)
+[![DOI](https://img.shields.io/badge/DOI-10.1111%2Fmec.70014-blue)](https://doi.org/10.1111/mec.70014){target=_blank}
 
 This repository contains scripts and data used for the genomic evaluation of assisted gene flow options in endangered Eastern Massasauga rattlesnakes (*Sistrurus catenatus*). The analysis framework assesses genetic compatibility between potential donor and recipient populations for conservation translocation programs.
+
+---
 
 **Keywords**: conservation genomics, assisted gene flow, genetic compatibility, population genetics, endangered species, rattlesnake, genomic analysis, GATK pipeline
 
@@ -19,7 +21,7 @@ This repository contains scripts and data used for the genomic evaluation of ass
 
 ## Citation
 
-**Mathur, S., & Gibbs, H. L. (2025).** Genomic evaluation of assisted gene flow options in an endangered rattlesnake. *Molecular Ecology*. [https://doi.org/10.1111/mec.70014](https://doi.org/10.1111/mec.70014)
+**Mathur, S., & Gibbs, H. L. (2025).** Genomic evaluation of assisted gene flow options in an endangered rattlesnake. *Molecular Ecology*. [https://doi.org/10.1111/mec.70014](https://doi.org/10.1111/mec.70014){target=_blank}
 
 
 ## Research Overview
@@ -105,10 +107,10 @@ install.packages(c("tidyverse", "ggplot2", "dplyr", "readr",
 
 ## Related Resources
 
-- **Raw sequence data**: NCBI BioProject [PRJNA1220313](https://www.ncbi.nlm.nih.gov/bioproject/PRJNA1220313)
-- **Published article**: [Molecular Ecology DOI: 10.1111/mec.70014](https://doi.org/10.1111/mec.70014)
-- **GATK Best Practices**: [https://gatk.broadinstitute.org/hc/en-us/sections/360007226651](https://gatk.broadinstitute.org/hc/en-us/sections/360007226651)
-- **SnpEff Documentation**: [https://pcingola.github.io/SnpEff/](https://pcingola.github.io/SnpEff/)
+- **Raw sequence data**: NCBI BioProject [PRJNA1220313](https://www.ncbi.nlm.nih.gov/bioproject/PRJNA1220313){target=_blank}
+- **Published article**: [Molecular Ecology DOI: 10.1111/mec.70014](https://doi.org/10.1111/mec.70014){target=_blank}
+- **GATK Best Practices**: [https://gatk.broadinstitute.org/hc/en-us/sections/360007226651](https://gatk.broadinstitute.org/hc/en-us/sections/360007226651){target=_blank}
+- **SnpEff Documentation**: [https://pcingola.github.io/SnpEff/](https://pcingola.github.io/SnpEff/){target=_blank}
 
 ##  Support
 
@@ -122,8 +124,6 @@ For questions about this analysis framework:
 
 The Eastern Massasauga rattlesnake is listed as **Threatened** under the U.S. Endangered Species Act. This research contributes to evidence-based conservation strategies for this ecologically important species.
 
----
-
 *⭐ If you find this repository useful for your research, please consider starring it and citing our paper!*
 
 <hr>
@@ -132,8 +132,4 @@ The Eastern Massasauga rattlesnake is listed as **Threatened** under the U.S. En
 </p>
 <hr>
 
-- Conservation genetics community for feedback and collaboration
 
----
-
-**Keywords**: conservation genomics, assisted gene flow, genetic compatibility, population genetics, endangered species, rattlesnake, genomic analysis, GATK pipeline
