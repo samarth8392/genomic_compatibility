@@ -40,7 +40,7 @@ This study introduces a novel genomic approach to evaluate genetic compatibility
 
 ## Repository Structure
 
-```
+```bash
 genomic_compatibility/
 ├── metadata/                           # Metadata and annotation files
 │   ├── Data1.csv                      # Sample metadata
